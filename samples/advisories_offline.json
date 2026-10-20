@@ -1,0 +1,50 @@
+{
+  "_note": "Bundled reference advisories for OFFLINE demo only. Live mode discovers advisories at runtime with Tavily. Always confirm details on the vendor page before acting.",
+  "advisories": [
+    {
+      "id": "cisco-sa-iosxe-webui-privesc-j22SaA4z",
+      "cve": ["CVE-2023-20198", "CVE-2023-20273"],
+      "title": "Cisco IOS XE Software Web UI Privilege Escalation",
+      "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z",
+      "severity": "critical",
+      "cvss": 10.0,
+      "kev": true,
+      "os_family": "IOS-XE",
+      "affected_versions": "Cisco IOS XE Software with the Web UI feature enabled (16.x and 17.x trains before fixed releases)",
+      "fixed_versions": "See vendor advisory for per-train fixed releases (e.g. 17.9.4a, 17.6.6a, 17.3.8a, 16.12.10a)",
+      "vulnerable_feature": "HTTP Server / Web UI (ip http server or ip http secure-server)",
+      "exploitation_conditions": "Web UI reachable by the attacker, i.e. 'ip http server' or 'ip http secure-server' configured",
+      "workaround": "no ip http server and no ip http secure-server on internet-facing systems, or restrict access with an ACL"
+    },
+    {
+      "id": "PAN-SA-2024-3400",
+      "cve": ["CVE-2024-3400"],
+      "title": "PAN-OS: OS Command Injection Vulnerability in GlobalProtect",
+      "url": "https://security.paloaltonetworks.com/CVE-2024-3400",
+      "severity": "critical",
+      "cvss": 10.0,
+      "kev": true,
+      "os_family": "PAN-OS",
+      "affected_versions": "PAN-OS 10.2, 11.0 and 11.1 before hotfix releases",
+      "fixed_versions": "e.g. 10.2.9-h1, 11.0.4-h1, 11.1.2-h3 and later (see advisory)",
+      "vulnerable_feature": "GlobalProtect gateway or GlobalProtect portal",
+      "exploitation_conditions": "Firewall configured with a GlobalProtect gateway or portal",
+      "workaround": "Upgrade to a fixed hotfix; Threat Prevention signatures as interim mitigation per advisory"
+    },
+    {
+      "id": "cisco-sa-asaftd-ravpn-auth-8LyfCkeC",
+      "cve": ["CVE-2023-20269"],
+      "title": "Cisco ASA and FTD Remote Access VPN Unauthorized Access",
+      "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-asaftd-ravpn-auth-8LyfCkeC",
+      "severity": "medium",
+      "cvss": 5.0,
+      "kev": true,
+      "os_family": "ASA",
+      "affected_versions": "Cisco ASA Software with remote access VPN enabled (see advisory for fixed releases)",
+      "fixed_versions": "See vendor advisory",
+      "vulnerable_feature": "Remote access VPN (WebVPN / AnyConnect) with connection profiles",
+      "exploitation_conditions": "Remote access VPN enabled; brute force against default connection profiles/tunnel groups (e.g. DefaultWEBVPNGroup, DefaultRAGroup) or LOCAL authentication",
+      "workaround": "Restrict default connection profiles (vpn-simultaneous-logins 0 in DfltGrpPolicy), use DAP, enable threat-detection for VPN"
+    }
+  ]
+}

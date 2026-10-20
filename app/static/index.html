@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExposureLens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0f0c; --panel:#111712; --panel2:#161e17; --line:#243026; --ink:#e6efe6; --muted:#8fa491;
+  --nv:#76b900; --exposed:#ff5d4d; --review:#f2b531; --safe:#4fc38a; --link:#9fd356;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+code,pre,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:var(--link)}
+header{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border:2px solid var(--nv);border-radius:50%;position:relative}
+.logo:after{content:"";position:absolute;inset:7px;background:var(--nv);border-radius:50%}
+header h1{font-size:19px;margin:0;letter-spacing:.3px} header .tag{color:var(--muted);font-size:13px}
+header .pill{margin-left:auto;font-size:12px;color:var(--muted)} .pill b{color:var(--nv)}
+main{max-width:1180px;margin:0 auto;padding:26px 20px 80px}
+.hero{display:grid;grid-template-columns:1.25fr 1fr;gap:22px}
+@media(max-width:900px){.hero{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 12px;font-weight:600}
+.lead{font-size:22px;line-height:1.35;margin:0 0 10px;font-weight:600}
+.lead em{font-style:normal;color:var(--nv)}
+.sub{color:var(--muted);margin:0 0 16px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+input[type=text],input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:10px 12px;border-radius:7px;font:inherit}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.has{border-color:var(--nv);color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+button{font:600 14px "IBM Plex Sans",system-ui,sans-serif;border-radius:7px;padding:11px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+button.primary{background:var(--nv);color:#0b0f0c;border-color:var(--nv)}
+button:disabled{opacity:.5;cursor:wait}
+.pipeline{display:grid;gap:8px}
+.stage{display:flex;gap:10px;align-items:center;padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.stage .t{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--nv);color:var(--nv);font-family:"IBM Plex Mono";min-width:52px;text-align:center}
+.stage.on{border-color:var(--nv)} .stage small{color:var(--muted);display:block}
+#log{max-height:170px;overflow:auto;font-size:12px;color:var(--muted);margin-top:12px;padding:8px;background:#070a08;border-radius:6px;display:none}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}
+@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi b{font-size:30px;display:block;font-family:"IBM Plex Mono"} .kpi span{color:var(--muted);font-size:13px}
+.k-exp b{color:var(--exposed)} .k-rev b{color:var(--review)} .k-safe b{color:var(--safe)} .k-cost b{color:var(--nv);font-size:24px}
+.brief{border-left:3px solid var(--nv)} .brief h3{margin:0 0 8px;font-size:18px}
+.brief ul{margin:6px 0 10px 18px;padding:0}
+.finding{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:12px;overflow:hidden}
+.fhead{display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;padding:14px 16px;cursor:pointer}
+.badge{font:600 11px "IBM Plex Mono",ui-monospace,monospace;padding:4px 8px;border-radius:5px;text-align:center}
+.EXPOSED{background:rgba(255,93,77,.15);color:var(--exposed);border:1px solid var(--exposed)}
+.NEEDS_REVIEW{background:rgba(242,181,49,.12);color:var(--review);border:1px solid var(--review)}
+.NOT_EXPOSED{background:rgba(79,195,138,.12);color:var(--safe);border:1px solid var(--safe)}
+.fhead .meta{color:var(--muted);font-size:13px} .score{font:600 18px "IBM Plex Mono",ui-monospace,monospace}
+.fbody{display:none;padding:0 16px 16px;border-top:1px solid var(--line)} .finding.open .fbody{display:block}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px} @media(max-width:800px){.cols{grid-template-columns:1fr}}
+pre{background:#070a08;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font-size:12.5px;margin:6px 0}
+.ev{font-size:13px} .ev .ln{color:var(--nv);font-family:"IBM Plex Mono";margin-right:8px}
+.note{font-size:12px;color:var(--review)}
+table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:500}
+.hidden{display:none} .muted{color:var(--muted)} .err{color:var(--exposed)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:40px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div><h1>ExposureLens</h1><div class="tag">Config-aware vulnerability exposure agents</div></div>
+  <div class="pill">Powered by <b>NVIDIA Nemotron</b> on Nebius Token Factory · Tavily</div>
+</header>
+<main>
+  <section class="hero">
+    <div class="card">
+      <p class="lead">Version scanners say you're vulnerable. <em>Your config says whether you're exposed.</em></p>
+      <p class="sub">Upload device configs. Agents find the advisories that matter, check each one against the exact lines of your config, and hand you a cited verdict and a reviewed mitigation. Read-only: nothing touches your devices.</p>
+      <div class="drop" id="drop">Drop Cisco IOS-XE / ASA / PAN-OS config files here or click to choose (max 6)</div>
+      <input type="file" id="files" multiple class="hidden" accept=".txt,.cfg,.conf,.log">
+      <label for="focus">Focus on an advisory or CVE (optional)</label>
+      <input type="text" id="focus" placeholder="e.g. CVE-2024-3400 or 'GlobalProtect'">
+      <div id="keywrap" class="hidden"><label for="key">Demo access key (from the Devpost testing instructions)</label>
+      <input type="password" id="key"></div>
+      <div class="row">
+        <button class="primary" id="runSample">Scan the sample fleet</button>
+        <button id="runUpload">Scan my files</button>
+      </div>
+      <p id="status" class="muted" style="margin:12px 0 0"></p>
+    </div>
+    <div class="card">
+      <h2>Agent pipeline</h2>
+      <div class="pipeline" id="stages"></div>
+      <div id="log" class="mono"></div>
+    </div>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="kpis">
+      <div class="kpi k-exp"><b id="kExp">0</b><span>Exposed</span></div>
+      <div class="kpi k-rev"><b id="kRev">0</b><span>Needs review</span></div>
+      <div class="kpi k-safe"><b id="kSafe">0</b><span>Ruled out by config evidence</span></div>
+      <div class="kpi k-cost"><b id="kCost">-</b><span id="kCostSub">vs all-Ultra</span></div>
+    </div>
+    <div class="card brief" id="brief"></div>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2 style="margin:18px 0 0">Findings, highest risk first</h2>
+      <button id="dl">Download report (.md)</button>
+    </div>
+    <div id="findings"></div>
+    <div class="card" style="margin-top:22px">
+      <h2>Which Nemotron did what</h2>
+      <table id="usage"></table>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Costs are estimates from per-token list prices; set PRICE_* env vars to update.</p>
+    </div>
+  </section>
+  <footer>Proposed commands are drafts for human review in your change process. ExposureLens never connects to network devices.</footer>
+</main>
+<script>
+const STAGES=[
+ ["fingerprint","NANO","Fingerprint","Reads each config, lists enabled features with line proof"],
+ ["advisories","TAVILY + SUPER","Advisory hunt","Live PSIRT / CISA search, structured and source-checked"],
+ ["judge","ULTRA","Exposure judge","Do this config's lines meet this advisory's exploit conditions?"],
+ ["validate","CODE","Evidence check","Every cited line is verified against the file; ungrounded claims downgraded"],
+ ["brief","SUPER","Fix + brief","Interim mitigation, verify, rollback, and a 24-hour plan"]];
+const $=id=>document.getElementById(id); let picked=[], jobId=null, poll=null;
+$("stages").innerHTML=STAGES.map(s=>`<div class="stage" id="st-${s[0]}"><span class="t">${s[1]}</span><div><b>${s[2]}</b><small>${s[3]}</small></div></div>`).join("");
+fetch("/api/health").then(r=>r.json()).then(h=>{ if(h.access_key_required) $("keywrap").classList.remove("hidden");
+  if(!h.nebius_key) $("status").innerHTML='<span class="err">Server has no NEBIUS_API_KEY configured.</span>';
+  if(!h.tavily_key) $("status").innerHTML+=' <span class="muted">Tavily key missing: advisories come from the bundled offline pack.</span>';});
+$("drop").onclick=()=>$("files").click();
+$("files").onchange=e=>setFiles([...e.target.files]);
+$("drop").ondragover=e=>{e.preventDefault()}; $("drop").ondrop=e=>{e.preventDefault();setFiles([...e.dataTransfer.files])};
+function setFiles(f){picked=f.slice(0,6);$("drop").textContent=picked.map(x=>x.name).join(", ")||"Drop files";$("drop").classList.toggle("has",picked.length>0)}
+$("runSample").onclick=()=>start(true); $("runUpload").onclick=()=>{ if(!picked.length){$("status").textContent="Choose at least one config file first.";return} start(false)};
+async function start(sample){
+  const fd=new FormData(); if(sample) fd.append("use_samples","true"); picked.forEach(f=>fd.append("files",f)); fd.append("focus",$("focus").value);
+  setBusy(true); $("results").classList.add("hidden"); $("log").style.display="block"; $("log").innerHTML="";
+  document.querySelectorAll(".stage").forEach(s=>s.classList.remove("on"));
+  const r=await fetch("/api/scan",{method:"POST",body:fd,headers:{"x-access-key":$("key").value||""}});
+  const j=await r.json(); if(!r.ok){$("status").innerHTML=`<span class="err">${j.detail}</span>`;setBusy(false);return}
+  jobId=j.job_id; $("status").textContent="Scanning... agents are working"; poll=setInterval(check,1500);
+}
+function setBusy(b){$("runSample").disabled=b;$("runUpload").disabled=b}
+async function check(){
+  const j=await (await fetch(`/api/scan/${jobId}`)).json();
+  $("log").innerHTML=j.events.map(e=>`[${e.t}s] ${e.stage}: ${esc(e.msg)}`).join("<br>"); $("log").scrollTop=1e9;
+  const seen=new Set(j.events.map(e=>e.stage)); STAGES.forEach(s=>{ if(seen.has(s[0])||(s[0]=="validate"&&seen.has("judge"))) $("st-"+s[0]).classList.add("on")});
+  if(j.status==="done"){clearInterval(poll);setBusy(false);$("status").textContent="Done.";render(j.result)}
+  if(j.status==="error"){clearInterval(poll);setBusy(false);$("status").innerHTML=`<span class="err">${esc(j.error)}</span>`}
+}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const list=a=>(a||[]).map(x=>`<li>${esc(x)}</li>`).join("");
+function render(r){
+  $("results").classList.remove("hidden");
+  $("kExp").textContent=r.counts.EXPOSED; $("kRev").textContent=r.counts.NEEDS_REVIEW; $("kSafe").textContent=r.counts.NOT_EXPOSED;
+  $("kCost").textContent="$"+r.usage.est_cost_usd.toFixed(4); $("kCostSub").textContent=`${r.usage.savings_pct}% cheaper than all-Ultra`;
+  const b=r.brief; $("brief").innerHTML=`<h3>${esc(b.headline)}</h3><b>Next 24 hours</b><ul>${list(b.next_24h)}</ul><b>This week</b><ul>${list(b.this_week)}</ul><p class="muted">${esc(b.noise_avoided)}</p><p class="muted" style="font-size:12px">Advisory source: ${r.advisory_source.join(", ")} · ${r.elapsed_s}s</p>`;
+  $("findings").innerHTML=r.findings.map((f,i)=>{const a=f.advisory,v=f.verdict,m=f.remediation;
+   return `<div class="finding" id="f${i}"><div class="fhead" onclick="this.parentNode.classList.toggle('open')">
+   <span class="badge ${v.verdict}">${v.verdict.replace("_"," ")}</span>
+   <div><b>${esc(f.device)}</b> · ${esc(a.title)}<div class="meta">${esc(f.os)} · ${esc((a.cve||[]).join(", "))} · ${esc(a.severity)}${a.kev?" · CISA KEV":""} · confidence ${Math.round((v.confidence||0)*100)}%</div></div>
+   <span class="score">${f.score}</span></div>
+   <div class="fbody"><div class="cols"><div><h2>Why</h2><p>${esc(v.reasoning)}</p>
+   <h2>Config evidence (verified)</h2>${(v.evidence||[]).map(e=>`<div class="ev"><span class="ln">L${e.line}</span><code>${esc(e.text)}</code></div>`).join("")||'<span class="muted">none</span>'}
+   ${v.grounding_note?`<p class="note">${esc(v.grounding_note)}</p>`:""}
+   ${(v.missing_info||[]).length?`<p class="muted">Missing: ${esc(v.missing_info.join("; "))}</p>`:""}
+   <p><a href="${esc(a.url)}" target="_blank" rel="noopener">Vendor advisory</a> <span class="muted">(${esc(a.source)})</span></p></div>
+   <div>${m?`<h2>Proposed interim mitigation · ${esc(m.change_risk)} risk</h2><pre>${esc((m.interim_mitigation||[]).join("\n"))}</pre>
+   <h2>Verify</h2><pre>${esc((m.verification||[]).join("\n"))}</pre><h2>Rollback</h2><pre>${esc((m.rollback||[]).join("\n"))}</pre>
+   <p><b>Permanent fix:</b> ${esc(m.permanent_fix)}</p><p class="muted">${esc(m.business_impact)}</p>`:'<h2>No action needed</h2><p class="muted">A required exploit condition is absent in this config.</p>'}</div></div></div></div>`}).join("");
+  const t=r.usage.tiers; $("usage").innerHTML="<tr><th>Tier</th><th>Model</th><th>Job</th><th>Calls</th><th>Tokens</th><th>Avg latency</th><th>Est. cost</th></tr>"+
+   Object.entries(t).map(([k,s])=>`<tr><td class="mono">${k}</td><td class="mono">${esc(s.model)}</td><td>${esc(s.role)}</td><td>${s.calls}</td><td>${s.prompt_tokens+s.completion_tokens}</td><td>${s.avg_latency_ms} ms</td><td>$${s.est_cost_usd.toFixed(4)}</td></tr>`).join("");
+}
+$("dl").onclick=()=>window.open(`/api/scan/${jobId}/report.md`,"_blank");
+</script>
+</body>
+</html>

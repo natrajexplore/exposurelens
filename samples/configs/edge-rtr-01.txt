@@ -1,0 +1,44 @@
+! show version (excerpt)
+! Cisco IOS XE Software, Version 17.06.05
+! cisco C8300-1N1S-6T (1RU) processor
+!
+version 17.6
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname edge-rtr-01
+!
+boot-start-marker
+boot-end-marker
+!
+aaa new-model
+aaa authentication login default local
+aaa authorization exec default local
+!
+username netadmin privilege 15 secret 9 $9$SYNTHETICHASHONLY
+!
+interface GigabitEthernet0/0/0
+ description WAN-ISP-A (internet)
+ ip address 203.0.113.10 255.255.255.252
+ ip nat outside
+ negotiation auto
+!
+interface GigabitEthernet0/0/1
+ description LAN-CORE
+ ip address 10.10.0.1 255.255.255.0
+ ip nat inside
+!
+ip http server
+ip http authentication local
+ip http secure-server
+ip http client source-interface GigabitEthernet0/0/1
+!
+ip ssh version 2
+!
+snmp-server community lab-ro RO
+!
+line vty 0 4
+ transport input ssh
+!
+end

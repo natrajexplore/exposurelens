@@ -1,0 +1,19 @@
+# show system info (excerpt)
+hostname: fw-edge-01
+model: PA-3220
+sw-version: 11.1.2
+#
+# show config running (set format, excerpt)
+set deviceconfig system hostname fw-edge-01
+set deviceconfig system device-telemetry device-health-performance yes
+set network interface ethernet ethernet1/1 layer3 ip 192.0.2.20/29
+set network interface ethernet ethernet1/1 comment "untrust-internet"
+set network interface ethernet ethernet1/2 layer3 ip 10.30.0.1/24
+set zone untrust network layer3 ethernet1/1
+set zone trust network layer3 ethernet1/2
+set global-protect global-protect-portal GP-PORTAL portal-config local-address interface ethernet1/1
+set global-protect global-protect-gateway GP-GW tunnel-mode yes
+set global-protect global-protect-gateway GP-GW local-address interface ethernet1/1
+set network interface ethernet ethernet1/1 layer3 interface-management-profile allow-ping
+set network profiles interface-management-profile allow-ping ping yes
+set rulebase security rules allow-gp from untrust to untrust application panos-global-protect action allow
