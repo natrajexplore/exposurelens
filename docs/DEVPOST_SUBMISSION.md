@@ -10,7 +10,22 @@ Deadline: **Fri 30 Oct 2026, 10:00 am PDT = 10:30 pm IST.** Submit by 29 Oct; do
 
 **Track:** Best Apps and Agents
 
-**Built with:** nvidia-nemotron, nebius-token-factory, tavily, python, fastapi, openai-sdk, docker
+**Built with:** nvidia-nemotron, nebius-token-factory, tavily, python, fastapi, openai-sdk, docker, uv
+
+**"Try it out" links:**
+- GitHub: https://github.com/natrajexplore/exposurelens
+- Docker image: https://github.com/users/natrajexplore/packages/container/package/exposurelens
+
+**Video demo link:** `<your YouTube URL, set to Public>`
+
+**Image gallery** (3:2 ratio such as 1500×1000 PNG; take these from your recorded run):
+1. Home page with the tagline and the "Agent pipeline" panel.
+2. Results: the four KPI cards and the fleet brief.
+3. edge-rtr-01 expanded: `L32 ip http server` evidence plus mitigation, verify and rollback.
+4. branch-rtr-02 expanded: `L22 no ip http server` and "No action needed".
+5. The "Which Nemotron did what" table.
+
+**Form order:** name → tagline → gallery → video → About (description below) → Built with → Try it out → track and hackathon questions → testing instructions → feedback. Save as draft, preview, then submit.
 
 ## Description (paste into "About the project")
 
@@ -32,19 +47,23 @@ In the demo, two routers run the same vulnerable IOS-XE version. A version scann
 - **Tavily** advanced search, restricted to vendor PSIRT, CISA and NVD domains; advisories whose URL didn't come from Tavily are discarded.
 - **Deterministic grounding layer** in Python: line-numbered configs, regex quick facts that override model guesses for version/OS, evidence validation, and a transparent risk score (severity, KEV, verdict, internet-facing).
 - **FastAPI + single-page UI** with live agent progress and a "Which Nemotron did what" ledger showing calls, tokens, latency and cost per tier versus an all-Ultra baseline.
-- **Batch job** (`jobs/nightly_scan.py`) packaged in the same Docker image for Nebius Serverless Jobs.
+- **Curated + live advisories**: live Tavily results are merged with a small curated pack (deduplicated by CVE), so well-known cases are always judged even when live search doesn't surface them on a given run.
+- **Cost guard**: every model call is metered, and calls stop once estimated spend reaches a configurable budget (`BUDGET_USD`, default $0.50), persisted across runs.
+- **Batch job** (`jobs/nightly_scan.py`) in the same Docker image, so the pipeline can run as a nightly scan as well as an interactive app. Pre-built image: `ghcr.io/natrajexplore/exposurelens`.
 
 ### Challenges
-- Getting reliable JSON from reasoning models: JSON mode where supported, `<think>`-block stripping, and a single strict retry.
-- Stopping confident hallucinations: the model must cite exact lines, and code checks them.
-- Version strings differ between `show version` and running config; deterministic parsing wins over the model.
+- **Reasoning ate the answer.** On the first live run, Nemotron 3 Nano spent its whole 2,500-token budget on hidden reasoning and returned empty content. `reasoning_effort: low` fixed Super and Ultra but not Nano; turning off the hidden trace (`enable_thinking: false`) and asking for the reasoning inside the JSON fixed all three tiers.
+- **Plausible but wrong verdicts.** Without hidden reasoning, Ultra marked a firewall EXPOSED to two management-interface CVEs because its interface-management profile existed, although that profile only allows ping. It also treated ASA "9.16.4" as matching affected builds "9.16.4.67/.70". Two strict judge rules fixed this: a related setting isn't evidence of the vulnerable feature, and an imprecise version match is at most NEEDS_REVIEW. A rescan got 6/6 verdicts right.
+- **Live search isn't repeatable.** The same Tavily query returned the Cisco IOS-XE Web UI advisory on one run and not the next, which would have silently dropped the headline demo case. Merging live results with curated advisories made it stable.
+- **Stopping confident hallucinations.** The model must cite exact config lines and Python checks them; an EXPOSED claim with no verifiable line is downgraded.
 
 ### Accomplishments
-- A verdict you can paste into a change ticket: cited lines, advisory link, mitigation, rollback.
-- Tier routing that cut estimated model cost by roughly half versus using Ultra everywhere (exact figure shown live in the app).
+- A verdict you can paste into a change ticket: cited lines, advisory link, mitigation, verify and rollback commands.
+- Tier routing makes a full sample-fleet scan cost about $0.01–0.02 in estimated Token Factory spend, 54–66% less than running every call on Ultra across our test runs (exact figure shown live in the app).
+- Measured, not assumed: the app's ledger showed Ultra was the fastest tier (about 2 s per verdict) and Nano the slowest.
 
 ### What we learned
-Most of the value is in the boundary between model and code: let Ultra reason, but let Python decide what counts as evidence.
+Most of the value is in the boundary between model and code: let Ultra judge, but let Python decide what counts as evidence. Writing explicit rules about what is *not* proof did more for accuracy than hidden reasoning tokens did.
 
 ### What's next
 Live pulls from device inventories (NetBox, Cisco Catalyst Center, Panorama) over read-only APIs, more vendors (FortiOS, Junos), and ticket creation in ServiceNow/Jira.
