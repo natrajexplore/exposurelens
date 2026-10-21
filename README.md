@@ -60,8 +60,8 @@ With [uv](https://docs.astral.sh/uv/) (recommended):
 ```bash
 git clone https://github.com/natrajexplore/exposurelens && cd exposurelens
 uv sync
-cp .env.example .env          # add NEBIUS_API_KEY and TAVILY_API_KEY
-uv run python scripts/list_models.py --test   # copy the exact Nemotron IDs into .env
+cp .env.example .env          # add NEBIUS_API_KEY (and optionally TAVILY_API_KEY)
+uv run python scripts/list_models.py --test   # checks all three Nemotron tiers answer
 uv run uvicorn app.main:app --reload
 ```
 
@@ -73,8 +73,8 @@ With pip:
 git clone https://github.com/natrajexplore/exposurelens && cd exposurelens
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env          # add NEBIUS_API_KEY and TAVILY_API_KEY
-python scripts/list_models.py --test   # copy the exact Nemotron IDs into .env
+cp .env.example .env          # add NEBIUS_API_KEY (and optionally TAVILY_API_KEY)
+python scripts/list_models.py --test   # checks all three Nemotron tiers answer
 uvicorn app.main:app --reload
 ```
 
@@ -86,13 +86,35 @@ clearly labelled in the UI.
 
 **Batch mode:** `CONFIG_DIR=samples/configs OUTPUT_DIR=out python -m jobs.nightly_scan`
 
-**Docker:** `docker build -t exposurelens . && docker run -p 8000:8000 --env-file .env exposurelens`
+**Cost guard:** model calls stop once estimated spend reaches `BUDGET_USD` (default $0.50),
+tracked in `out/spend.json` across runs. A sample-fleet scan costs about $0.01–0.03.
 
-## Deploy
+## Run with Docker
 
-The Docker image runs on Nebius Serverless Endpoints or any container host. Set the same env
-vars; set `APP_ACCESS_KEY` so a public demo can't burn your credits, and share that key with
-judges in the Devpost testing instructions.
+Pre-built image, no clone needed:
+
+```bash
+docker run --rm -p 127.0.0.1:8000:8000 \
+  -e NEBIUS_API_KEY=your_key -e TAVILY_API_KEY=your_key \
+  ghcr.io/natrajexplore/exposurelens:latest
+```
+
+Or build it from the repo and reuse your `.env`:
+
+```bash
+docker build -t exposurelens .
+docker run --rm -p 127.0.0.1:8000:8000 --env-file .env -v "$PWD/out:/app/out" exposurelens
+```
+
+Docker's `--env-file` passes values literally, so write `NEBIUS_API_KEY=abc` in `.env`, not
+`NEBIUS_API_KEY="abc"`. The `-v` mount keeps the spend tracker across container restarts.
+Binding to `127.0.0.1` keeps the app reachable only from your machine.
+
+## Hosting
+
+ExposureLens is demoed locally. The same image runs on Nebius Serverless Endpoints or any
+container host; if you expose it publicly, set `APP_ACCESS_KEY` so visitors must enter a key
+before a scan can spend your credits.
 
 ## Project layout
 

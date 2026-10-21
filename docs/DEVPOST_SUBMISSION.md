@@ -50,11 +50,21 @@ Most of the value is in the boundary between model and code: let Ultra reason, b
 Live pulls from device inventories (NetBox, Cisco Catalyst Center, Panorama) over read-only APIs, more vendors (FortiOS, Junos), and ticket creation in ServiceNow/Jira.
 
 ## Testing instructions (for judges)
-1. Open the demo URL.
-2. Enter access key: `<APP_ACCESS_KEY>` (only if the page asks).
-3. Click **Scan the sample fleet** (4 synthetic devices). A scan takes about a minute.
+ExposureLens runs locally; there is no hosted demo. The video shows a full scan end to end.
+To run it yourself you need a Nebius Token Factory API key (the Nebius Builder Program gives
+free credits). A Tavily key is optional; without it, advisories come from a bundled, clearly
+labelled offline pack.
+
+1. Start it with the pre-built image (Docker), no clone needed:
+   ```bash
+   docker run --rm -p 127.0.0.1:8000:8000 -e NEBIUS_API_KEY=your_key -e TAVILY_API_KEY=your_key ghcr.io/natrajexplore/exposurelens:latest
+   ```
+   Or from source: `git clone https://github.com/natrajexplore/exposurelens && cd exposurelens && uv sync`, put the keys in `.env` (see `.env.example`), then `uv run uvicorn app.main:app`.
+2. Open http://localhost:8000 and click **Scan the sample fleet** (4 synthetic devices). A scan takes about a minute and costs about $0.01–0.03 in Token Factory credits.
+3. Check the key result: `edge-rtr-01` is **EXPOSED** (line 32 `ip http server`) and `branch-rtr-02` is **NOT EXPOSED** (line 22 `no ip http server`), although both run the same IOS-XE version.
 4. Open the top finding to see the cited config lines, mitigation, verify and rollback commands. Download the report.
 5. Optional: upload your own config (remove secrets) or type a CVE in the focus box, e.g. `CVE-2024-3400`.
+6. No API keys at all? `uv run pytest -q` runs the full pipeline offline against a simulated Nemotron.
 
 ## Feedback section (eligible for "Most Valuable Feedback")
 Write this from your real experience during the build — specific beats polite. Starter points to verify and expand:
