@@ -102,14 +102,27 @@ Results vary between runs for the same query. One run returned the Cisco IOS-XE 
 
 ## 3-minute video script (target 2:45)
 
-| Time | Screen | Voice-over |
-|---|---|---|
-| 0:00–0:20 | Vendor advisory page, then a spreadsheet of "affected devices" | "When a critical network CVE drops, scanners tell you which devices run the affected version. They can't tell you which ones are actually exposed. That gap costs network teams hours during the worst possible window." |
-| 0:20–0:35 | ExposureLens home | "I'm Nataraj, a network security engineer. ExposureLens reads your configs with NVIDIA Nemotron on Nebius Token Factory and proves exposure line by line." |
-| 0:35–1:05 | Click "Scan the sample fleet"; pipeline lights up; log scrolls | "Nemotron Nano fingerprints every device in parallel. Tavily searches vendor PSIRT and CISA live, and Nemotron Super structures what it finds. Nemotron Ultra then judges every device against every advisory." |
-| 1:05–1:45 | Results: KPI cards; expand edge-rtr-01 then branch-rtr-02 | "Same IOS-XE version on both routers. A version scanner flags both. ExposureLens marks this one exposed — line 32, ip http server — and rules this one out — line 22, no ip http server. Every cited line is checked in code; if the model can't prove it, the verdict is downgraded." |
-| 1:45–2:10 | Mitigation, verify, rollback blocks; download report | "For exposed devices it drafts the interim fix in the device's own CLI, with verification and rollback, ready for a change ticket. It never touches your devices." |
-| 2:10–2:35 | "Which Nemotron did what" table | "Ultra only does the verdicts; Nano and Super handle the volume. That routing makes this scan about half the cost of running everything on Ultra." |
-| 2:35–2:50 | Architecture diagram from README, GitHub URL | "Open source, MIT licensed, runs as an endpoint or a nightly job on Nebius. Stop triaging versions. Triage exposure." |
+Run one scan while recording and keep its result page. Each scan costs about $0.02, so do
+narration retakes over the same page rather than rescanning. Live advisories vary per run,
+so expect about 12 findings, not 4. The edge-rtr-01 / branch-rtr-02 pair always appears
+because curated advisories are always included.
 
-Recording tips: 1080p, browser zoom 110%, record the live scan once and trim waiting time; no copyrighted music; upload as Public on YouTube.
+| Time | Screen (what to do) | Voice-over |
+|---|---|---|
+| 0:00–0:20 | Tab with the [CVE-2023-20198 Cisco advisory](https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z); scroll slowly | "When a critical network CVE drops, scanners tell you which devices run the affected version. They can't tell you which ones are actually exposed. That gap costs network teams hours during the worst possible window." |
+| 0:20–0:35 | Switch to http://localhost:8000; hover the tagline "Your config says whether you're exposed." | "I'm Nataraj, a network security engineer. ExposureLens reads your configs with NVIDIA Nemotron on Nebius Token Factory and proves exposure line by line." |
+| 0:35–1:05 | Click **Scan the sample fleet**; the "Agent pipeline" stages light up (NANO → TAVILY + SUPER → ULTRA → CODE → SUPER) and the log scrolls. The scan takes 30–65 s: cut it to ~15 s in the edit | "Nemotron Nano fingerprints every device in parallel. Tavily searches vendor PSIRT and CISA live, and Nemotron Super structures what it finds. Nemotron Ultra then judges every device against every advisory." |
+| 1:05–1:20 | Results appear; point at the four KPI cards (Exposed, Needs review, Ruled out by config evidence, cost) | "Out of every advisory that matched a version, it ruled out [N] by config evidence alone. That's the noise a version scanner would have handed you." |
+| 1:20–1:45 | Click **edge-rtr-01** (top finding, score 100) to expand it: show `L32 ip http server` under "Config evidence (verified)". Scroll down to **branch-rtr-02 · IOS XE Web UI** among NOT EXPOSED and expand it: `L22 no ip http server`, "No action needed" | "Same IOS-XE version on both routers. A version scanner flags both. ExposureLens marks this one exposed — line 32, ip http server — and rules this one out — line 22, no ip http server. Every cited line is checked in code; if the model can't prove it, the verdict is downgraded." |
+| 1:45–2:10 | Back on edge-rtr-01's right column: mitigation, Verify and Rollback blocks; click **Download report (.md)** | "For exposed devices it drafts the interim fix in the device's own CLI, with verification and rollback, ready for a change ticket. It never touches your devices." |
+| 2:10–2:35 | Scroll to the **"Which Nemotron did what"** table | "Ultra only does the verdicts; Nano and Super handle the volume. That routing makes this scan cost less than half of running everything on Ultra. And interestingly, Ultra was our fastest tier, about two seconds per verdict." |
+| 2:35–2:50 | GitHub repo page: README pipeline diagram, then the URL | "Open source, MIT licensed, runs locally in Docker or as a nightly batch job. Stop triaging versions. Triage exposure." |
+
+Replace [N] with the "Ruled out by config evidence" number from your run.
+
+**Recording setup (Windows 11)**
+- Record with Snipping Tool (Win + Shift + R, select the browser window, turn the mic on). It's lighter on RAM than OBS while Docker runs.
+- Edit in Clipchamp: trim the scan wait, keep it under 3:00, export at 1080p.
+- Browser at 1080p, zoom 110%, bookmarks bar hidden (Ctrl+Shift+B). Turn on Do Not Disturb.
+- Never show `.env`, a terminal with keys, or the Token Factory console's key page.
+- No copyrighted music. Upload to YouTube as **Public**, not Unlisted.
