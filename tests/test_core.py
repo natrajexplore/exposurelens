@@ -14,8 +14,11 @@ def test_quick_facts():
     assert quick_facts((CFG / "edge-rtr-01.txt").read_text())["version"] == "17.06.05"
     pa = quick_facts((CFG / "fw-edge-01.txt").read_text())
     assert (pa["os_family"], pa["version"]) == ("PAN-OS", "11.1.2")
-    asa = quick_facts((CFG / "asa-vpn-01.txt").read_text())
-    assert (asa["os_family"], asa["version"], asa["hostname"]) == ("ASA", "9.16.4", "asa-vpn-01")
+    ftd = quick_facts((CFG / "ftd-vpn-01.txt").read_text())
+    assert (ftd["os_family"], ftd["version"], ftd["hostname"]) == ("FTD", "7.2.5", "ftd-vpn-01")
+    ise = quick_facts((CFG / "ise-01.txt").read_text())
+    assert (ise["vendor"], ise["os_family"], ise["version"], ise["hostname"]) == \
+        ("cisco", "ISE", "3.3.0.430 Patch 4", "ise-01")
 
 
 def test_evidence_grounding():
@@ -91,7 +94,8 @@ def test_live_advisories_keep_curated():
     advs, src = Pipeline(Router(), LiveHunter()).advisories_for(
         {"vendor": "paloalto", "os_family": "PAN-OS", "version": "11.1.2"}, None)
     assert src == "tavily-live"
-    assert [a["id"] for a in advs] == ["live-3400", "live-new"]  # curated 3400 deduped by CVE, ungrounded URL dropped
+    # curated 3400 wins over the live duplicate, live adds the new CVE, ungrounded URL dropped
+    assert [a["id"] for a in advs] == ["PAN-SA-2024-3400", "live-new"]
 
     advs, _ = Pipeline(Router(), LiveHunter()).advisories_for(
         {"vendor": "cisco", "os_family": "IOS-XE", "version": "17.06.05"}, None)

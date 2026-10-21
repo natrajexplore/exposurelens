@@ -1,0 +1,55 @@
+ise-01/admin# show version
+
+Cisco Application Deployment Engine OS Release: 3.3
+ADE-OS Build Version: 3.3.0.181
+ADE-OS System Architecture: x86_64
+
+Copyright (c) 2005-2024 by Cisco Systems, Inc.
+All rights reserved.
+Hostname: ise-01
+
+Version information of installed applications
+---------------------------------------------
+
+Cisco Identity Services Engine
+---------------------------------------------
+Version      : 3.3.0.430
+Build Date   : Thu Jun 20 10:12:06 2024
+Install Date : Tue Sep 10 08:44:13 2024
+
+Cisco Identity Services Engine Patch
+---------------------------------------------
+Version      : 4
+Install Date : Mon Mar 03 09:15:41 2025
+
+! inventory export (synthetic): deployment facts for this node
+! Platform: ISE-VM-K9 on VMware ESXi 8.0, on-premises data center (no AWS, Azure or OCI)
+! Node roles: Primary Administration, Monitoring, Policy Service (standalone deployment)
+
+ise-01/admin# show running-config
+
+Generating configuration...
+!
+hostname ise-01
+!
+ip domain-name corp.example
+!
+interface GigabitEthernet 0
+  ip address 10.50.0.10 255.255.255.0
+!
+ip name-server 10.50.0.2
+!
+ip default-gateway 10.50.0.1
+!
+clock timezone UTC
+!
+ntp server 10.50.0.3
+!
+username admin password hash $5$SYNTHETICHASH role admin
+!
+service sshd enable
+!
+logging loglevel 6
+!
+icmp echo on
+!

@@ -28,9 +28,17 @@ def quick_facts(text: str) -> dict:
         m = re.search(r"hostname\s+(\S+)", text)
         if m:
             facts["hostname"] = m.group(1)
-    elif re.search(r"^:?\s*ASA Version\s+(\S+)", text, re.M):
-        facts.update(vendor="cisco", os_family="ASA")
-        facts["version"] = re.search(r"ASA Version\s+(\S+)", text).group(1)
+    elif "Cisco Identity Services Engine" in text or "ADE-OS" in text:
+        facts.update(vendor="cisco", os_family="ISE")
+        m = re.search(r"Cisco Identity Services Engine\s*\n-+\s*\nVersion\s*:\s*(\S+)", text)
+        facts["version"] = m.group(1) if m else None
+        p = re.search(r"Cisco Identity Services Engine Patch\s*\n-+\s*\nVersion\s*:\s*(\d+)", text)
+        if facts["version"] and p:
+            facts["version"] += f" Patch {p.group(1)}"
+    elif re.search(r"^NGFW Version\s+\S+|Cisco Firepower Threat Defense", text, re.M):
+        facts.update(vendor="cisco", os_family="FTD")
+        m = re.search(r"^NGFW Version\s+(\S+)|Firepower Threat Defense.*?Version\s+(\S+)", text, re.M)
+        facts["version"] = (m.group(1) or m.group(2)) if m else None
     elif re.search(r"Cisco IOS XE|^version 1[6-9]\.", text, re.M):
         facts.update(vendor="cisco", os_family="IOS-XE")
         m = re.search(r"Version\s+(\d+\.\d+\.\d+\w*)", text)

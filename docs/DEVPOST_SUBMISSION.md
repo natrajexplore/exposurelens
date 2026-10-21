@@ -33,14 +33,14 @@ Deadline: **Fri 30 Oct 2026, 10:00 am PDT = 10:30 pm IST.** Submit by 29 Oct; do
 When a critical network advisory drops (the IOS-XE Web UI bug, PAN-OS GlobalProtect), every network team does the same thing: export the list of devices on affected versions, then open configs one by one to see whether the vulnerable feature is even turned on. Version scanners can't answer that question, so a 200-device fleet becomes hours of manual triage during the most stressful window. I've done this triage for 10 years as a network security engineer. I wanted an agent that does it in minutes and shows its proof.
 
 ### What it does
-Upload Cisco IOS-XE, ASA or PAN-OS configs. ExposureLens:
+Upload Cisco IOS-XE, Cisco Secure Firewall Threat Defense (FTD), Cisco ISE (ADE-OS) or Palo Alto PAN-OS configs. ExposureLens:
 1. Fingerprints each device: OS, version, and every security-relevant feature, with the config lines that prove it.
 2. Searches vendor PSIRT pages and CISA live with Tavily and structures the advisories that apply.
 3. Judges each device against each advisory: is the version affected, is the vulnerable feature configured, are the exploit conditions met, is there already a mitigation?
 4. Verifies every cited config line in code. An "exposed" claim without verifiable evidence is downgraded to "needs review".
 5. Drafts the interim mitigation in the device's own CLI, with verification and rollback commands, plus a 24-hour action brief.
 
-In the demo, two routers run the same vulnerable IOS-XE version. A version scanner flags both; ExposureLens marks one EXPOSED (line 32: `ip http server`) and rules the other out (line 22: `no ip http server`).
+In the demo, two routers run the same vulnerable IOS-XE version. A version scanner flags both; ExposureLens marks one EXPOSED (line 32: `ip http server`) and rules the other out (line 22: `no ip http server`). The same happens with two FTD 7.2.5 firewalls and the actively exploited VPN web server bugs (CVE-2025-20333/20362): only the one with AnyConnect on its outside interface is exposed. And on one Cisco ISE node it separates two critical CVEs: exposed to the unauthenticated RCE (CVE-2025-20281/20337, version and patch prove it), but not to the cloud static-credential bug (CVE-2025-20286), because the node is on-premises.
 
 ### How we built it
 - **NVIDIA Nemotron 3 on Nebius Token Factory**, routed by job: **Nano** fingerprints configs in parallel, **Super** structures advisories and drafts remediation, **Ultra** makes the exposure verdicts — the one step where reasoning quality decides everything.
@@ -53,7 +53,8 @@ In the demo, two routers run the same vulnerable IOS-XE version. A version scann
 
 ### Challenges
 - **Reasoning ate the answer.** On the first live run, Nemotron 3 Nano spent its whole 2,500-token budget on hidden reasoning and returned empty content. `reasoning_effort: low` fixed Super and Ultra but not Nano; turning off the hidden trace (`enable_thinking: false`) and asking for the reasoning inside the JSON fixed all three tiers.
-- **Plausible but wrong verdicts.** Without hidden reasoning, Ultra marked a firewall EXPOSED to two management-interface CVEs because its interface-management profile existed, although that profile only allows ping. It also treated ASA "9.16.4" as matching affected builds "9.16.4.67/.70". Two strict judge rules fixed this: a related setting isn't evidence of the vulnerable feature, and an imprecise version match is at most NEEDS_REVIEW. A rescan got 6/6 verdicts right.
+- **Plausible but wrong verdicts.** Without hidden reasoning, Ultra marked a firewall EXPOSED to two management-interface CVEs because its interface-management profile existed, although that profile only allows ping. It also treated a firewall's "9.16.4" as matching affected builds "9.16.4.67/.70". Two strict judge rules fixed this: a related setting isn't evidence of the vulnerable feature, and an imprecise version match is at most NEEDS_REVIEW. A rescan got 6/6 verdicts right.
+- **The advisory reader copied the device into the advisory.** When we added Cisco FTD and ISE, Super filled "affected versions" of live ISE advisories with the scanned device's own version ("3.3.0.430 Patch 4"), so Ultra wrongly found the device exposed to a CVE that only affects ISE 3.4. It also tagged an older ASA/FTD advisory with the wrong CVE. The fix: version ranges must be quoted from the source, never taken from the device, and verified curated advisories take precedence over live ones for the same CVE. The next scan got 11/11 verdicts right.
 - **Live search isn't repeatable.** The same Tavily query returned the Cisco IOS-XE Web UI advisory on one run and not the next, which would have silently dropped the headline demo case. Merging live results with curated advisories made it stable.
 - **Stopping confident hallucinations.** The model must cite exact config lines and Python checks them; an EXPOSED claim with no verifiable line is downgraded.
 
@@ -79,8 +80,8 @@ labelled offline pack.
    docker run --rm -p 127.0.0.1:8000:8000 -e NEBIUS_API_KEY=your_key -e TAVILY_API_KEY=your_key ghcr.io/natrajexplore/exposurelens:latest
    ```
    Or from source: `git clone https://github.com/natrajexplore/exposurelens && cd exposurelens && uv sync`, put the keys in `.env` (see `.env.example`), then `uv run uvicorn app.main:app`.
-2. Open http://localhost:8000 and click **Scan the sample fleet** (4 synthetic devices). A scan takes about a minute and costs about $0.01–0.03 in Token Factory credits.
-3. Check the key result: `edge-rtr-01` is **EXPOSED** (line 32 `ip http server`) and `branch-rtr-02` is **NOT EXPOSED** (line 22 `no ip http server`), although both run the same IOS-XE version.
+2. Open http://localhost:8000 and click **Scan the sample fleet** (6 synthetic devices). A scan takes about a minute and costs about $0.02–0.03 in Token Factory credits.
+3. Check the key result: `edge-rtr-01` is **EXPOSED** (line 32 `ip http server`) and `branch-rtr-02` is **NOT EXPOSED** (line 22 `no ip http server`), although both run the same IOS-XE version. Likewise `ftd-vpn-01` is EXPOSED to CVE-2025-20333 (AnyConnect on outside, lines 30–33) while `ftd-dc-01` on the same FTD 7.2.5 is not, and `ise-01` is EXPOSED to CVE-2025-20281/20337 but NOT EXPOSED to the cloud-only CVE-2025-20286.
 4. Open the top finding to see the cited config lines, mitigation, verify and rollback commands. Download the report.
 5. Optional: upload your own config (remove secrets) or type a CVE in the focus box, e.g. `CVE-2024-3400`.
 6. No API keys at all? `uv run pytest -q` runs the full pipeline offline against a simulated Nemotron.
@@ -91,7 +92,7 @@ in the Token Factory console.
 
 **What worked well**
 - OpenAI compatibility is the best part of Token Factory. Routing three Nemotron tiers is one `model=` string per call, and JSON mode (`response_format: json_object`) returned parseable JSON on Nano, Super and Ultra.
-- Domain-restricted Tavily search (`include_domains` set to vendor PSIRT, CISA and NVD) found real, current advisories, including PAN-OS and ASA advisories newer than our curated pack.
+- Domain-restricted Tavily search (`include_domains` set to vendor PSIRT, CISA and NVD) found real, current advisories, including PAN-OS and Cisco firewall advisories newer than our curated pack.
 
 **1. Nemotron 3 reasoning silently ate the whole token budget (biggest issue)**
 My first live scan failed on the very first call. Nano returned `content: ""` with `finish_reason: "length"` and 2,500/2,500 completion tokens; the hidden trace was in a non-standard `reasoning` field. A 20-token smoke test returned `None` the same way, which looked like a broken model rather than a reasoning budget problem.
@@ -123,7 +124,7 @@ Results vary between runs for the same query. One run returned the Cisco IOS-XE 
 
 Run one scan while recording and keep its result page. Each scan costs about $0.02, so do
 narration retakes over the same page rather than rescanning. Live advisories vary per run,
-so expect about 12 findings, not 4. The edge-rtr-01 / branch-rtr-02 pair always appears
+so expect 11 or more findings across 6 devices. The edge-rtr-01 / branch-rtr-02 pair always appears
 because curated advisories are always included.
 
 | Time | Screen (what to do) | Voice-over |

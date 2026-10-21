@@ -7,7 +7,8 @@ feature with whether it is ENABLED, and the exact config lines proving it.
 Features to look for (include others you find): HTTP/HTTPS management server or Web UI,
 SSH, Telnet, SNMP (v1/v2c communities), remote-access VPN (WebVPN/AnyConnect/GlobalProtect
 portal or gateway), IKE/IPsec, management access from outside/untrusted interfaces,
-device telemetry, local user accounts, AAA, logging.
+device telemetry, local user accounts, AAA, logging; for Cisco ISE also the installed patch,
+node roles and deployment platform (on-premises vs AWS/Azure/OCI cloud).
 Rules: only cite lines that exist; quote them exactly without the line-number prefix.
 If version is not stated in the text, use null. Do not guess.
 Return JSON:
@@ -20,6 +21,9 @@ ADVISORY_STRUCTURER = """You turn raw security search results into structured ad
 Only use facts present in the provided SOURCES. Every advisory MUST include the url of the
 source it came from, copied exactly from SOURCES. Skip anything not relevant to the
 device's vendor/OS family. Prefer vendor PSIRT pages and CISA KEV over news.
+The DEVICE line only tells you which advisories are relevant. Never copy the device's version
+into affected_versions or fixed_versions: quote the version ranges the source states, or write
+"unknown" if it states none. List only CVE IDs that the source itself names for that advisory.
 Return JSON:
 {"advisories":[{"id":str,"cve":[str],"title":str,"url":str,"severity":"critical|high|medium|low",
   "cvss":number|null,"kev":bool,"os_family":str,
@@ -43,8 +47,10 @@ Strict rules:
   evidence: a management profile that permits only ping does not expose the management
   web interface or SSH; an interface existing does not mean a service listens on it.
 - If the advisory lists specific builds or hotfixes and the config version is less precise
-  (e.g. config "9.16.4" vs affected "9.16.4.67"), version_match is "unknown" and the verdict
+  (e.g. config "7.2" vs affected "before 7.2.10.2"), version_match is "unknown" and the verdict
   can be at most NEEDS_REVIEW.
+- If the advisory says it applies regardless of configuration, a verified version (and patch)
+  match is sufficient: cite the version lines as evidence.
 Evidence must be exact config lines (without the "NNNN| " prefix) with their line numbers.
 Return JSON:
 {"verdict":"EXPOSED|NOT_EXPOSED|NEEDS_REVIEW","confidence":0-1,

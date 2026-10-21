@@ -1,0 +1,33 @@
+: Saved
+:
+: Serial Number: SYNTHETIC0005
+: Hardware:   FPR-2130
+:
+NGFW Version 7.2.5
+!
+hostname ftd-dc-01
+!
+interface Ethernet1/1
+ nameif campus
+ security-level 50
+ ip address 10.70.0.1 255.255.255.0
+!
+interface Ethernet1/2
+ nameif datacenter
+ security-level 100
+ ip address 10.80.0.1 255.255.255.0
+!
+interface Management1/1
+ management-only
+ nameif diagnostic
+ security-level 0
+!
+access-list CAMPUS-TO-DC extended permit tcp 10.70.0.0 255.255.255.0 10.80.0.0 255.255.255.0 eq https
+access-group CAMPUS-TO-DC in interface campus
+!
+! no webvpn, anyconnect or remote-access tunnel-group configured on this firewall
+!
+ssh 10.70.0.0 255.255.255.0 campus
+logging enable
+!
+: end

@@ -1,0 +1,52 @@
+: Saved
+:
+: Serial Number: SYNTHETIC0004
+: Hardware:   FPR-2130
+:
+NGFW Version 7.2.5
+!
+hostname ftd-vpn-01
+!
+interface Ethernet1/1
+ nameif outside
+ security-level 0
+ ip address 198.51.100.10 255.255.255.248
+!
+interface Ethernet1/2
+ nameif inside
+ security-level 100
+ ip address 10.60.0.1 255.255.255.0
+!
+interface Management1/1
+ management-only
+ nameif diagnostic
+ security-level 0
+!
+ip local pool RAVPN-POOL 10.61.0.10-10.61.0.250 mask 255.255.255.0
+!
+aaa-server ISE-RADIUS protocol radius
+aaa-server ISE-RADIUS (inside) host 10.50.0.10
+!
+webvpn
+ enable outside
+ anyconnect image disk0:/csm/anyconnect-win-4.10.08025-webdeploy-k9.pkg 1
+ anyconnect enable
+ tunnel-group-list enable
+!
+group-policy RAVPN-GP internal
+group-policy RAVPN-GP attributes
+ vpn-tunnel-protocol ssl-client
+ address-pools value RAVPN-POOL
+!
+tunnel-group RAVPN type remote-access
+tunnel-group RAVPN general-attributes
+ address-pool RAVPN-POOL
+ authentication-server-group ISE-RADIUS
+ default-group-policy RAVPN-GP
+tunnel-group RAVPN webvpn-attributes
+ group-alias RAVPN enable
+!
+ssh 10.60.0.0 255.255.255.0 inside
+logging enable
+!
+: end

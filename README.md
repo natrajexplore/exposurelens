@@ -9,7 +9,8 @@
 [![Docker image](https://img.shields.io/badge/docker-ghcr.io-2496ED.svg)](https://github.com/users/natrajexplore/packages/container/package/exposurelens)
 
 ExposureLens is a multi-agent app for network security teams. You upload device configs
-(Cisco IOS-XE, ASA, Palo Alto PAN-OS). Agents find the security advisories that apply,
+(Cisco IOS-XE, Cisco Secure Firewall Threat Defense (FTD), Cisco ISE on ADE-OS, Palo Alto
+PAN-OS). Agents find the security advisories that apply,
 decide for each device whether the vulnerable feature is actually configured, cite the exact
 config lines that prove it, and draft a mitigation with verify and rollback commands.
 
@@ -35,17 +36,19 @@ devices are really exposed. ExposureLens does that triage in minutes, with evide
 
 ## Results on the sample fleet
 
-Four synthetic devices ship in [`samples/configs/`](samples/configs). Two routers run the
-**same vulnerable IOS-XE version**; a version scanner flags both. A live scan:
+Six synthetic devices ship in [`samples/configs/`](samples/configs). Three pairs show the
+point: same version, different exposure. A version scanner flags every one of them. A live scan:
 
 | Device | OS | Advisory | Verdict | Proof (verified config line) |
 |---|---|---|---|---|
 | `edge-rtr-01` | IOS-XE 17.06.05 | CVE-2023-20198 Web UI | **EXPOSED** | L32 `ip http server` |
 | `branch-rtr-02` | IOS-XE 17.06.05 | CVE-2023-20198 Web UI | **NOT EXPOSED** | L22 `no ip http server` |
+| `ftd-vpn-01` | FTD 7.2.5 | CVE-2025-20333, CVE-2025-20362 VPN web server | **EXPOSED** | L30–33 `webvpn` / `enable outside` / `anyconnect enable` |
+| `ftd-dc-01` | FTD 7.2.5 | CVE-2025-20333, CVE-2025-20362 VPN web server | **NOT EXPOSED** | L28 no webvpn, AnyConnect or remote-access tunnel-group |
+| `ise-01` | ISE 3.3.0.430 Patch 4 | CVE-2025-20281, CVE-2025-20337 unauthenticated RCE | **EXPOSED** | L16, L22 version and Patch 4 (fixed in Patch 7; any config) |
+| `ise-01` | ISE 3.3.0.430 Patch 4 | CVE-2025-20286 cloud static credential | **NOT EXPOSED** | L26–27 on-premises VMware, not AWS/Azure/OCI |
 | `fw-edge-01` | PAN-OS 11.1.2 | CVE-2024-3400 GlobalProtect | **EXPOSED** | L14 GlobalProtect portal on `ethernet1/1` (untrust) |
 | `fw-edge-01` | PAN-OS 11.1.2 | CVE-2024-0012, CVE-2025-0111 mgmt interface | **NOT EXPOSED** | L18 management profile allows ping only |
-| `asa-vpn-01` | ASA 9.16.4 | CVE-2023-20269 remote-access VPN | **EXPOSED** | L20–21 `webvpn` / `enable outside` |
-| `asa-vpn-01` | ASA 9.16.4 | ASA SSH DoS (affects 9.16.4.67/.70) | **NEEDS REVIEW** | config says `9.16.4`; exact build can't be confirmed |
 
 Live runs also surface newer advisories; each run's set varies with what Tavily finds.
 For every EXPOSED finding the app drafts an interim mitigation, verification and rollback
@@ -67,7 +70,7 @@ flowchart LR
 | Stage | Model | Why this tier |
 |---|---|---|
 | Fingerprint every config: OS, version, enabled features, proof lines | **Nemotron 3 Nano** | High-volume structured extraction; runs once per device in parallel |
-| Turn live Tavily results from vendor PSIRT / CISA into structured advisories (affected versions, vulnerable feature, exploit conditions, workaround) | **Nemotron 3 Super** | Long-context reading of many sources; output is source-checked (every advisory URL must come from Tavily results). Curated advisories are merged in, deduplicated by CVE, so well-known cases are never missed |
+| Turn live Tavily results from vendor PSIRT / CISA into structured advisories (affected versions, vulnerable feature, exploit conditions, workaround) | **Nemotron 3 Super** | Long-context reading of many sources; output is source-checked (every advisory URL must come from Tavily results, and version ranges must be quoted from the source). Curated advisories are always judged and take precedence on overlapping CVEs; live results add the rest |
 | Decide EXPOSED / NOT_EXPOSED / NEEDS_REVIEW for each device × advisory | **Nemotron 3 Ultra** | The hard reasoning step: version range + feature presence + reachability + existing mitigations |
 | Verify every cited config line exists in the file | Python | The model never gets the last word on evidence. An EXPOSED verdict with no verifiable lines is downgraded to NEEDS_REVIEW |
 | Draft interim mitigation, verification, rollback, permanent fix; write the 24-hour brief | **Nemotron 3 Super** | Structured drafting at a fraction of Ultra's cost |
@@ -88,6 +91,8 @@ All commands are labelled as drafts for human review in your change process.
      not expose the management web interface.
    - If the advisory names specific builds and the config version is less precise, the
      verdict can be at most NEEDS_REVIEW.
+   - If the advisory applies regardless of configuration (like the ISE RCE), a verified
+     version and patch match is enough.
 3. **Python checks the evidence.** Each cited line must exist in the file (line numbers are
    corrected if the text is found elsewhere); fabricated lines are discarded, and EXPOSED
    without verified evidence becomes NEEDS_REVIEW.
@@ -101,9 +106,10 @@ list prices (`PRICE_*` in `.env` to update).
 
 | Run | Verdicts | Calls | Time | Est. cost | vs all-Ultra | Avg latency Nano / Super / Ultra |
 |---|---|---|---|---|---|---|
-| Curated advisories only | 4 | 12 | 17 s | $0.008 | 59.5% cheaper | 4.9 / 3.9 / 1.8 s |
-| Live Tavily | 6 | 17 | 30 s | $0.014 | 66.0% cheaper | 4.5 / 3.7 / 2.3 s |
-| Live + curated, in Docker | 12 | 25 | 65 s | $0.023 | 54.4% cheaper | 3.9 / 3.3 / 10.4 s |
+| **Current 6-device fleet, live + curated** | 11 | 27 | 42 s | $0.024 | 60.2% cheaper | 4.0 / 3.2 / 2.1 s |
+| Earlier 4-device fleet, curated only | 4 | 12 | 17 s | $0.008 | 59.5% cheaper | 4.9 / 3.9 / 1.8 s |
+| Earlier 4-device fleet, live | 6 | 17 | 30 s | $0.014 | 66.0% cheaper | 4.5 / 3.7 / 2.3 s |
+| Earlier 4-device fleet, live + curated, in Docker | 12 | 25 | 65 s | $0.023 | 54.4% cheaper | 3.9 / 3.3 / 10.4 s |
 
 Latency varies a lot between runs. Ultra was the fastest tier in most runs (about 2 s per
 verdict) but averaged 10.4 s in the largest one, so verdicts run in parallel (4 workers) to
@@ -250,7 +256,8 @@ docs/                   Plan and Devpost submission kit
 
 ## Limitations
 
-- Supports Cisco IOS-XE, ASA and PAN-OS configs today; others are parsed best-effort.
+- Supports Cisco IOS-XE, FTD, ISE (ADE-OS) and Palo Alto PAN-OS configs today; others are parsed best-effort.
+- For Cisco ISE, deployment facts such as cloud vs on-premises aren't in `show running-config`; include them (as in `samples/configs/ise-01.txt`) or the verdict may be NEEDS_REVIEW.
 - Verdicts depend on the config you upload; runtime state (e.g. a feature enabled via GUI and not saved) is out of scope.
 - Advisory facts come from public pages at scan time. Always confirm on the vendor advisory before changing production.
 - Costs shown are estimates from list prices, not your Token Factory bill.
