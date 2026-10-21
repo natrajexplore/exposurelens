@@ -19,10 +19,11 @@ Powered by **NVIDIA Nemotron 3 (Nano, Super, Ultra) on Nebius Token Factory**, w
 for live advisory discovery. MIT licensed.
 
 **Contents:** [Problem](#the-problem) · [Results](#results-on-the-sample-fleet) ·
-[How it works](#how-it-works) · [Verdicts](#how-a-verdict-is-decided) ·
-[Performance](#measured-cost-and-latency) · [Quick start](#quick-start) ·
-[Docker](#run-with-docker) · [Configuration](#configuration) · [API](#api) ·
-[Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
+[Platforms](#supported-platforms-and-curated-advisories) · [How it works](#how-it-works) ·
+[Verdicts](#how-a-verdict-is-decided) · [Performance](#measured-cost-and-latency) ·
+[Quick start](#quick-start) · [Docker](#run-with-docker) ·
+[Local domain](#run-on-a-local-domain-optional) · [Configuration](#configuration) · [API](#api) ·
+[Troubleshooting](#troubleshooting) · [Changelog](#changelog) · [Roadmap](#roadmap)
 
 ---
 
@@ -53,6 +54,21 @@ point: same version, different exposure. A version scanner flags every one of th
 Live runs also surface newer advisories; each run's set varies with what Tavily finds.
 For every EXPOSED finding the app drafts an interim mitigation, verification and rollback
 commands, and a permanent fix, plus a 24-hour brief for the whole fleet.
+
+## Supported platforms and curated advisories
+
+Live Tavily search finds current advisories for any of these platforms. A small curated pack
+of verified advisories is always judged as well, so the most important cases never depend on
+what search returns that day.
+
+| Platform | Detected from | Sample devices | Curated advisories (always checked) | Exposure depends on |
+|---|---|---|---|---|
+| Cisco IOS-XE | `Cisco IOS XE Software, Version` | `edge-rtr-01`, `branch-rtr-02` | CVE-2023-20198 / 20273 Web UI (critical, KEV) | `ip http server` / `ip http secure-server` |
+| Cisco Secure Firewall Threat Defense (FTD) | `NGFW Version` banner | `ftd-vpn-01`, `ftd-dc-01` | CVE-2025-20333 VPN web server RCE (critical, KEV); CVE-2025-20362 unauthorized access (KEV) | AnyConnect SSL VPN / IKEv2 remote access on a reachable interface |
+| Cisco ISE on ADE-OS | `show version`: ISE version and patch | `ise-01` | CVE-2025-20281 / 20337 unauthenticated RCE (CVSS 10, KEV); CVE-2025-20286 cloud static credential | RCE: version and patch only (any config). Credential bug: Primary Admin node in AWS, Azure or OCI |
+| Palo Alto PAN-OS | `sw-version:` | `fw-edge-01` | CVE-2024-3400 GlobalProtect (critical, KEV) | GlobalProtect portal or gateway |
+
+All sample configs are synthetic: documentation and private IP ranges, fake serials and hashes.
 
 ## How it works
 
@@ -140,6 +156,16 @@ uv run python scripts/list_models.py --test   # checks all three Nemotron tiers 
 uv run uvicorn app.main:app --reload
 ```
 
+On Windows **Command Prompt** (after `uv sync` and creating `.env` as above):
+
+```bat
+cd /d "C:\path\to\exposurelens"
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Keep that window open (minimised) while you use the app; press **Ctrl+C** to stop it. The
+FastAPI backend serves the web UI too, so this one command runs both.
+
 With pip:
 
 ```bash
@@ -185,6 +211,27 @@ Docker's `--env-file` passes values literally, so write `NEBIUS_API_KEY=abc` in 
 `NEBIUS_API_KEY="abc"`. The `-v` mount keeps the spend tracker across container restarts.
 Binding to `127.0.0.1` keeps the app reachable only from your machine.
 
+## Run on a local domain (optional)
+
+For demos you can serve the app at a name such as **http://nemocve.com** on your own machine.
+Nothing is published: the name only resolves on the PC where you add it.
+
+1. Point the name at your machine. In **PowerShell as Administrator** (Windows):
+   ```powershell
+   Add-Content "$env:SystemRoot\System32\drivers\etc\hosts" "`n127.0.0.1`tnemocve.com`n127.0.0.1`twww.nemocve.com"
+   ipconfig /flushdns
+   ```
+   On macOS/Linux: `echo "127.0.0.1 nemocve.com www.nemocve.com" | sudo tee -a /etc/hosts`
+2. Serve the app on port 80 (so no `:8000` is needed):
+   ```bash
+   uv run uvicorn app.main:app --host 127.0.0.1 --port 80
+   # or with Docker:
+   docker run --rm -p 127.0.0.1:80:8000 -e NEBIUS_API_KEY=your_key ghcr.io/natrajexplore/exposurelens:latest
+   ```
+3. Open **http://nemocve.com** and type the `http://` part. There is no certificate, so `https://` won't work.
+
+To undo it, delete the two `nemocve.com` lines from the hosts file and run `ipconfig /flushdns`.
+
 ## Configuration
 
 All settings are environment variables (or `.env`, see [`.env.example`](.env.example)).
@@ -228,6 +275,9 @@ curl -s localhost:8000/api/scan/<job_id>                          # poll until s
 | `Budget reached` | Estimated spend hit `BUDGET_USD`. Raise it or delete `out/spend.json` |
 | Different advisories on each run | Live search results vary. Curated advisories are always included, so the core cases stay stable |
 | `Permission denied: '/app/out'` on a container host | The platform runs as non-root; set `SPEND_FILE=/tmp/exposurelens/spend.json` |
+| `nemocve.com` (or your local name) doesn't open | The hosts entry is missing: editing the hosts file needs **Administrator** rights, and without them the command fails with "access denied". Check with `ping nemocve.com`, which should reply from `127.0.0.1` |
+| Local name opens but shows nothing | Nothing is listening on port 80: start the app with `--port 80` (or Docker `-p 127.0.0.1:80:8000`), and type `http://`, not `https://` |
+| `address already in use` on port 8000 or 80 | Another copy is running, e.g. the Docker container. Stop it with `docker stop exposurelens` or Ctrl+C in the other window |
 
 ## Hosting
 
@@ -261,6 +311,18 @@ docs/                   Plan and Devpost submission kit
 - Verdicts depend on the config you upload; runtime state (e.g. a feature enabled via GUI and not saved) is out of scope.
 - Advisory facts come from public pages at scan time. Always confirm on the vendor advisory before changing production.
 - Costs shown are estimates from list prices, not your Token Factory bill.
+
+## Changelog
+
+**October 2026 (hackathon build)**
+
+- **Cisco FTD and Cisco ISE (ADE-OS) replace Cisco ASA.** New sample devices and curated advisories: FTD CVE-2025-20333/20362, ISE CVE-2025-20281/20337 and CVE-2025-20286. FTD and ISE version/patch detection; the judge accepts a version/patch match when an advisory applies regardless of configuration.
+- **Safer live advisories.** Version ranges must be quoted from the source, never copied from the scanned device. Curated advisories always run and take precedence over live ones for the same CVE.
+- **Stricter verdicts.** A related setting (e.g. a ping-only management profile) isn't evidence; an imprecise version match is at most NEEDS_REVIEW.
+- **Token Factory fixes.** Exact model IDs per tier; hidden reasoning turned off (`enable_thinking: false`) after it consumed the whole token budget and returned empty answers.
+- **Cost guard.** `BUDGET_USD` (default $0.50) stops model calls once estimated spend is reached, persisted across runs.
+- **Local-first showcase.** Pre-built Docker image on `ghcr.io`, localhost-only binding, optional local domain (`http://nemocve.com`), Windows Command Prompt instructions.
+- **Project setup.** `uv` project with `uv.lock`, `.dockerignore` keeps `.env` out of images, offline test suite (7 tests).
 
 ## Roadmap
 
