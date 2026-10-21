@@ -60,7 +60,7 @@ In the demo, two routers run the same vulnerable IOS-XE version. A version scann
 ### Accomplishments
 - A verdict you can paste into a change ticket: cited lines, advisory link, mitigation, verify and rollback commands.
 - Tier routing makes a full sample-fleet scan cost about $0.01–0.02 in estimated Token Factory spend, 54–66% less than running every call on Ultra across our test runs (exact figure shown live in the app).
-- Measured, not assumed: the app's ledger showed Ultra was the fastest tier (about 2 s per verdict) and Nano the slowest.
+- Measured, not assumed: the app's ledger showed Ultra was often the fastest tier (about 2 s per verdict in most runs), the opposite of what we expected when choosing tiers.
 
 ### What we learned
 Most of the value is in the boundary between model and code: let Ultra judge, but let Python decide what counts as evidence. Writing explicit rules about what is *not* proof did more for accuracy than hidden reasoning tokens did.
@@ -103,8 +103,8 @@ Suggestions: document per-model reasoning controls on each model card; make `rea
 **2. Model ID naming is inconsistent within one family**
 The catalog lists `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, `nvidia/nemotron-3-super-120b-a12b` and `nvidia/Nemotron-3-Ultra-550b-a55b`: three different casing and prefix conventions for one model family. My guessed IDs (`Nemotron-3-Super-120B-A12B`, etc.) failed, and I had to list models through the API to find the exact strings. Consistent IDs, or case-insensitive matching, would save every builder this step.
 
-**3. Latency surprised us: Ultra was the fastest tier**
-Measured in the app's ledger over three scans (hidden reasoning off): Ultra averaged 1.8–2.3 s per call, Super 3.7–6.0 s, Nano 4.5–11.0 s. Ultra's per-token output speed was also higher. That inverts the usual assumption that the small model is the fast one. Published latency and throughput figures per model would help builders choose tiers; we picked Nano for speed and it turned out to be our slowest tier.
+**3. Latency surprised us, in both directions**
+Measured in the app's ledger over four scans (hidden reasoning off): in three runs Ultra averaged 1.8–2.3 s per call, faster than Super (3.3–6.0 s) and Nano (3.9–11.0 s). That inverts the usual assumption that the small model is the fast one; we picked Nano for speed and it was usually our slowest tier. But in the fourth run, with 12 verdicts in parallel, Ultra averaged 10.4 s. Published latency and throughput figures per model, and some guidance on how latency behaves under concurrent requests, would help builders choose tiers.
 
 **4. Cost visibility and spending limits**
 - I could not find an official per-token price for Nemotron 3 Ultra, so the app's cost table uses estimates (a scan came to roughly $0.01–0.02, 55–66% below running everything on Ultra). [verify: compare with the console's usage page]
@@ -134,7 +134,7 @@ because curated advisories are always included.
 | 1:05–1:20 | Results appear; point at the four KPI cards (Exposed, Needs review, Ruled out by config evidence, cost) | "Out of every advisory that matched a version, it ruled out [N] by config evidence alone. That's the noise a version scanner would have handed you." |
 | 1:20–1:45 | Click **edge-rtr-01** (top finding, score 100) to expand it: show `L32 ip http server` under "Config evidence (verified)". Scroll down to **branch-rtr-02 · IOS XE Web UI** among NOT EXPOSED and expand it: `L22 no ip http server`, "No action needed" | "Same IOS-XE version on both routers. A version scanner flags both. ExposureLens marks this one exposed — line 32, ip http server — and rules this one out — line 22, no ip http server. Every cited line is checked in code; if the model can't prove it, the verdict is downgraded." |
 | 1:45–2:10 | Back on edge-rtr-01's right column: mitigation, Verify and Rollback blocks; click **Download report (.md)** | "For exposed devices it drafts the interim fix in the device's own CLI, with verification and rollback, ready for a change ticket. It never touches your devices." |
-| 2:10–2:35 | Scroll to the **"Which Nemotron did what"** table | "Ultra only does the verdicts; Nano and Super handle the volume. That routing makes this scan cost less than half of running everything on Ultra. And interestingly, Ultra was our fastest tier, about two seconds per verdict." |
+| 2:10–2:35 | Scroll to the **"Which Nemotron did what"** table | "Ultra only does the verdicts; Nano and Super handle the volume. That routing makes this scan cost less than half of running everything on Ultra. [Only if Ultra has the lowest Avg latency in your run:] And interestingly, Ultra was the fastest tier here." |
 | 2:35–2:50 | GitHub repo page: README pipeline diagram, then the URL | "Open source, MIT licensed, runs locally in Docker or as a nightly batch job. Stop triaging versions. Triage exposure." |
 
 Replace [N] with the "Ruled out by config evidence" number from your run.
