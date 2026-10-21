@@ -67,12 +67,38 @@ labelled offline pack.
 6. No API keys at all? `uv run pytest -q` runs the full pipeline offline against a simulated Nemotron.
 
 ## Feedback section (eligible for "Most Valuable Feedback")
-Write this from your real experience during the build — specific beats polite. Starter points to verify and expand:
-- Token Factory: OpenAI compatibility made tier routing trivial. Note any model-ID naming inconsistencies you hit (case, version suffixes, `-fast` variants) and whether JSON mode worked per model.
-- Record real latency for Nano vs Super vs Ultra from the app's ledger and say where Ultra's latency hurt the UX.
-- Was there a way to see per-model usage/cost in the console that matched your app's numbers?
-- Nemotron reasoning traces: how `<think>` output interacted with structured output; what would make it easier (e.g. a documented flag to disable reasoning per request).
-- Tavily: domain-restricted advanced search quality on PSIRT pages; anything missing (e.g. publish dates).
+Draft from the actual build (21 Oct 2026). Before pasting, check the two items marked [verify]
+in the Token Factory console.
+
+**What worked well**
+- OpenAI compatibility is the best part of Token Factory. Routing three Nemotron tiers is one `model=` string per call, and JSON mode (`response_format: json_object`) returned parseable JSON on Nano, Super and Ultra.
+- Domain-restricted Tavily search (`include_domains` set to vendor PSIRT, CISA and NVD) found real, current advisories, including PAN-OS and ASA advisories newer than our curated pack.
+
+**1. Nemotron 3 reasoning silently ate the whole token budget (biggest issue)**
+My first live scan failed on the very first call. Nano returned `content: ""` with `finish_reason: "length"` and 2,500/2,500 completion tokens; the hidden trace was in a non-standard `reasoning` field. A 20-token smoke test returned `None` the same way, which looked like a broken model rather than a reasoning budget problem.
+- `reasoning_effort: "low"` did not help on Nano (still 2,500 tokens, empty content) but did work on Super and Ultra.
+- What worked on all three was `extra_body={"chat_template_kwargs": {"enable_thinking": false}}`, which I found by trial and error.
+
+Suggestions: document per-model reasoning controls on each model card; make `reasoning_effort` behave the same across Nemotron tiers; and when reasoning exhausts `max_tokens`, return a clear warning or error instead of an empty successful response.
+
+**2. Model ID naming is inconsistent within one family**
+The catalog lists `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, `nvidia/nemotron-3-super-120b-a12b` and `nvidia/Nemotron-3-Ultra-550b-a55b`: three different casing and prefix conventions for one model family. My guessed IDs (`Nemotron-3-Super-120B-A12B`, etc.) failed, and I had to list models through the API to find the exact strings. Consistent IDs, or case-insensitive matching, would save every builder this step.
+
+**3. Latency surprised us: Ultra was the fastest tier**
+Measured in the app's ledger over three scans (hidden reasoning off): Ultra averaged 1.8–2.3 s per call, Super 3.7–6.0 s, Nano 4.5–11.0 s. Ultra's per-token output speed was also higher. That inverts the usual assumption that the small model is the fast one. Published latency and throughput figures per model would help builders choose tiers; we picked Nano for speed and it turned out to be our slowest tier.
+
+**4. Cost visibility and spending limits**
+- I could not find an official per-token price for Nemotron 3 Ultra, so the app's cost table uses estimates (a scan came to roughly $0.01–0.02, 55–66% below running everything on Ultra). [verify: compare with the console's usage page]
+- There's no hard spending cap per API key that I could find [verify in console], so I built one into the app. A per-key budget limit, and per-request cost in the `usage` object, would make Token Factory much safer for hackathon and demo keys.
+
+**5. Small papercuts**
+- An API key accidentally wrapped in quotes (Docker `--env-file` keeps them) returned `401 "Couldn't authenticate. Reason: Unable authenticate"`. A hint such as "key contains unexpected characters" would have saved debugging time.
+- The `nebius` CLI documents only Ubuntu and macOS installs, so Windows developers need WSL or the web console.
+- For Serverless Endpoints, the only built-in auth is a Bearer token, which a browser web UI can't send. An option suited to web demos (e.g. basic auth or an IP allowlist) would help app builders.
+- Builder Program credit amounts differ between the terms page and the announcement blog post; one clear figure would help.
+
+**6. Tavily**
+Results vary between runs for the same query. One run returned the Cisco IOS-XE Web UI advisory (CVE-2023-20198) and the next didn't, and the number of PAN-OS advisories went from 5 to 3. For security workflows where completeness matters, a "stable" or cached mode, and advisory publish dates in results, would help. We now merge live results with a curated pack so well-known cases never drop out.
 
 ## 3-minute video script (target 2:45)
 
