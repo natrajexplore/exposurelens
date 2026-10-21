@@ -12,15 +12,16 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 
 BASE_URL = os.getenv("NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1/")
 
 # Exact IDs differ per account/region: run `python scripts/list_models.py`
 # and set these in .env to the IDs your Token Factory catalog shows.
 TIER_MODELS = {
-    "nano": os.getenv("NEMOTRON_NANO_MODEL", "nvidia/Nemotron-3-Nano-30B-A3B"),
-    "super": os.getenv("NEMOTRON_SUPER_MODEL", "nvidia/Nemotron-3-Super-120B-A12B"),
-    "ultra": os.getenv("NEMOTRON_ULTRA_MODEL", "nvidia/Nemotron-3-Ultra-550B-A55B"),
+    "nano": os.getenv("NEMOTRON_NANO_MODEL", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"),
+    "super": os.getenv("NEMOTRON_SUPER_MODEL", "nvidia/nemotron-3-super-120b-a12b"),
+    "ultra": os.getenv("NEMOTRON_ULTRA_MODEL", "nvidia/Nemotron-3-Ultra-550b-a55b"),
 }
 
 # Estimated USD per 1M tokens (input, output). Override with env if prices change.
@@ -43,6 +44,24 @@ TIER_ROLES = {
     "super": "Advisory structuring, remediation drafting, fleet brief",
     "ultra": "Exposure verdicts: does THIS config meet THIS advisory's exploit conditions?",
 }
+
+# Hard stop on estimated spend, persisted across runs so restarts don't reset it.
+BUDGET_USD = float(os.getenv("BUDGET_USD", "0.50"))
+SPEND_FILE = Path(os.getenv("SPEND_FILE", Path(__file__).resolve().parent.parent / "out" / "spend.json"))
+_spend_lock = threading.Lock()
+
+
+def spent_usd() -> float:
+    try:
+        return float(json.loads(SPEND_FILE.read_text())["est_spent_usd"])
+    except (OSError, ValueError, KeyError):
+        return 0.0
+
+
+def _add_spend(cost: float) -> None:
+    with _spend_lock:
+        SPEND_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SPEND_FILE.write_text(json.dumps({"est_spent_usd": round(spent_usd() + cost, 6)}))
 
 
 @dataclass
@@ -136,10 +155,17 @@ class NemotronRouter:
              max_tokens: int = 2048, temperature: float = 0.1) -> dict:
         model = TIER_MODELS[tier]
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=temperature)
+        # Nemotron 3 reasons by default and can spend the whole token budget before
+        # answering (empty content, finish=length). The prompts ask for reasoning
+        # inside the JSON instead, so the hidden trace is turned off.
+        kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=temperature,
+                      extra_body={"chat_template_kwargs": {"enable_thinking": False}})
         t0 = time.time()
         last_err = None
         for attempt in range(2):
+            if spent_usd() >= BUDGET_USD:
+                raise RuntimeError(f"Budget reached: estimated spend ${spent_usd():.4f} >= "
+                                   f"BUDGET_USD ${BUDGET_USD:.2f}. Raise BUDGET_USD or reset {SPEND_FILE.name}.")
             try:
                 use_json = self._json_mode_ok.get(model, True)
                 if use_json:
@@ -154,13 +180,14 @@ class NemotronRouter:
                             raise
                 else:
                     resp = self.client.chat.completions.create(**kwargs)
-                content = resp.choices[0].message.content or ""
-                data = extract_json(content)
                 u = resp.usage
-                self.ledger.add(CallRecord(tier, model, purpose,
-                                           getattr(u, "prompt_tokens", 0) or 0,
-                                           getattr(u, "completion_tokens", 0) or 0,
-                                           int((time.time() - t0) * 1000), True))
+                rec = CallRecord(tier, model, purpose,
+                                 getattr(u, "prompt_tokens", 0) or 0,
+                                 getattr(u, "completion_tokens", 0) or 0,
+                                 int((time.time() - t0) * 1000), True)
+                _add_spend(rec.cost)  # billed even if the reply isn't valid JSON
+                data = extract_json(resp.choices[0].message.content or "")
+                self.ledger.add(rec)
                 return data
             except Exception as e:  # retry once with a stricter reminder
                 last_err = e

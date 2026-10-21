@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from .advisories import AdvisoryHunter  # noqa: E402
-from .llm import Ledger, NemotronRouter, TIER_MODELS, TIER_ROLES  # noqa: E402
+from .llm import BUDGET_USD, Ledger, NemotronRouter, TIER_MODELS, TIER_ROLES, spent_usd  # noqa: E402
 from .pipeline import Pipeline  # noqa: E402
 from .report import to_markdown  # noqa: E402
 
@@ -46,6 +46,7 @@ def health():
         "tavily_key": bool(os.getenv("TAVILY_API_KEY")),
         "access_key_required": bool(ACCESS_KEY),
         "models": TIER_MODELS, "roles": TIER_ROLES,
+        "budget_usd": BUDGET_USD, "est_spent_usd": round(spent_usd(), 4),
     }
 
 

@@ -35,6 +35,15 @@ def test_risk_score_orders():
     assert risk_score("critical", "EXPOSED", True, True) > risk_score("critical", "NOT_EXPOSED", True, True)
 
 
+def test_budget_blocks_calls(tmp_path, monkeypatch):
+    import pytest
+    from app import llm
+    monkeypatch.setattr(llm, "SPEND_FILE", tmp_path / "spend.json")
+    llm._add_spend(0.60)
+    with pytest.raises(RuntimeError, match="Budget reached"):
+        llm.NemotronRouter(api_key="unused").call("nano", "s", "u", purpose="t")
+
+
 class FakeRouter:
     """Mimics Nemotron replies so the orchestration can be tested without API keys."""
     def __init__(self):
