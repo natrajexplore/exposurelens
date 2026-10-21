@@ -72,6 +72,32 @@ class NoTavily:
     live = False
 
 
+def test_live_advisories_keep_curated():
+    class LiveHunter:
+        live = True
+        def search(self, *a):
+            return [{"url": "https://security.paloaltonetworks.com/CVE-2024-3400", "title": "", "content": ""},
+                    {"url": "https://example.com/new", "title": "", "content": ""}]
+
+    class Router(FakeRouter):
+        def call(self, tier, system, user, purpose, **kw):
+            if purpose.startswith("advisories"):
+                return {"advisories": [
+                    {"id": "live-3400", "cve": ["cve-2024-3400"], "url": "https://security.paloaltonetworks.com/CVE-2024-3400"},
+                    {"id": "live-new", "cve": ["CVE-2099-0001"], "url": "https://example.com/new"},
+                    {"id": "made-up", "cve": ["CVE-2099-0002"], "url": "https://not-from-tavily.example"}]}
+            return super().call(tier, system, user, purpose, **kw)
+
+    advs, src = Pipeline(Router(), LiveHunter()).advisories_for(
+        {"vendor": "paloalto", "os_family": "PAN-OS", "version": "11.1.2"}, None)
+    assert src == "tavily-live"
+    assert [a["id"] for a in advs] == ["live-3400", "live-new"]  # curated 3400 deduped by CVE, ungrounded URL dropped
+
+    advs, _ = Pipeline(Router(), LiveHunter()).advisories_for(
+        {"vendor": "cisco", "os_family": "IOS-XE", "version": "17.06.05"}, None)
+    assert "cisco-sa-iosxe-webui-privesc-j22SaA4z" in [a["id"] for a in advs]  # curated kept when live misses it
+
+
 def test_pipeline_end_to_end():
     configs = {p.name: p.read_text() for p in CFG.glob("*.txt")}
     res = Pipeline(FakeRouter(), NoTavily()).run(configs)

@@ -59,7 +59,12 @@ class Pipeline:
                 for a in advs:
                     a["source"] = "tavily-live"
                 if advs:
-                    return advs, "tavily-live"
+                    # keep curated advisories too, so a well-known case never drops out
+                    # just because live search didn't surface it this run
+                    seen = {c.upper() for a in advs for c in a.get("cve", [])}
+                    curated = [a for a in offline_advisories(osf)
+                               if not seen & {c.upper() for c in a.get("cve", [])}]
+                    return advs + curated, "tavily-live"
             self.emit("advisories", f"No grounded live advisories for {osf}; using offline pack")
         return offline_advisories(osf), "offline-pack"
 
