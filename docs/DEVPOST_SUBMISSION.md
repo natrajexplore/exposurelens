@@ -120,7 +120,7 @@ Measured in the app's ledger over four scans (hidden reasoning off): in three ru
 **6. Tavily**
 Results vary between runs for the same query. One run returned the Cisco IOS-XE Web UI advisory (CVE-2023-20198) and the next didn't, and the number of PAN-OS advisories went from 5 to 3. For security workflows where completeness matters, a "stable" or cached mode, and advisory publish dates in results, would help. We now merge live results with a curated pack so well-known cases never drop out.
 
-## 3-minute video script (target 2:45)
+## 3-minute video script (target 2:55, hard limit 3:00)
 
 Run one scan while recording and keep its result page. Each scan costs about $0.02, so do
 narration retakes over the same page rather than rescanning. Live advisories vary per run,
@@ -134,9 +134,10 @@ because curated advisories are always included.
 | 0:35–1:05 | Click **Scan the sample fleet**; the "Agent pipeline" stages light up (NANO → TAVILY + SUPER → ULTRA → CODE → SUPER) and the log scrolls. The scan takes 30–65 s: cut it to ~15 s in the edit | "Nemotron Nano fingerprints every device in parallel. Tavily searches vendor PSIRT and CISA live, and Nemotron Super structures what it finds. Nemotron Ultra then judges every device against every advisory." |
 | 1:05–1:20 | Results appear; point at the four KPI cards (Exposed, Needs review, Ruled out by config evidence, cost) | "Out of every advisory that matched a version, it ruled out [N] by config evidence alone. That's the noise a version scanner would have handed you." |
 | 1:20–1:45 | Click **edge-rtr-01** (top finding, score 100) to expand it: show `L32 ip http server` under "Config evidence (verified)". Scroll down to **branch-rtr-02 · IOS XE Web UI** among NOT EXPOSED and expand it: `L22 no ip http server`, "No action needed" | "Same IOS-XE version on both routers. A version scanner flags both. ExposureLens marks this one exposed — line 32, ip http server — and rules this one out — line 22, no ip http server. Every cited line is checked in code; if the model can't prove it, the verdict is downgraded." |
-| 1:45–2:10 | Back on edge-rtr-01's right column: mitigation, Verify and Rollback blocks; click **Download report (.md)** | "For exposed devices it drafts the interim fix in the device's own CLI, with verification and rollback, ready for a change ticket. It never touches your devices." |
-| 2:10–2:35 | Scroll to the **"Which Nemotron did what"** table | "Ultra only does the verdicts; Nano and Super handle the volume. That routing makes this scan cost less than half of running everything on Ultra. [Only if Ultra has the lowest Avg latency in your run:] And interestingly, Ultra was the fastest tier here." |
-| 2:35–2:50 | GitHub repo page: README pipeline diagram, then the URL | "Open source, MIT licensed, runs locally in Docker or as a nightly batch job. Stop triaging versions. Triage exposure." |
+| 1:45–2:05 | Collapse branch-rtr-02. Point at the finding headers (no need to expand): **ftd-vpn-01 · EXPOSED** (VPN Web Server RCE, CVE-2025-20333) near the top, then scroll to **ftd-dc-01 · NOT EXPOSED** (same advisory). Then expand **ise-01 · NOT EXPOSED** (CVE-2025-20286) to show `L26–27` on-premises VMware, with **ise-01 · EXPOSED** (CVE-2025-20281) visible above it | "It's not just routers. These two FTD firewalls run the same release, hit by actively exploited VPN web server bugs. Only the one with AnyConnect on the internet is exposed. And on this ISE node, it confirms the critical RCE from the version and patch, but rules out the cloud credential bug: the node is on-premises." |
+| 2:05–2:25 | Back on edge-rtr-01's right column: mitigation, Verify and Rollback blocks; click **Download report (.md)** | "For exposed devices it drafts the interim fix in the device's own CLI, with verification and rollback, ready for a change ticket. It never touches your devices." |
+| 2:25–2:43 | Scroll to the **"Which Nemotron did what"** table | "Ultra only does the verdicts; Nano and Super handle the volume, so the scan costs less than half of running everything on Ultra. [Only if Ultra has the lowest Avg latency in your run:] And Ultra was the fastest tier here." |
+| 2:43–2:55 | GitHub repo page: README pipeline diagram, then the URL | "Open source, MIT licensed, runs locally in Docker or as a nightly batch job. Stop triaging versions. Triage exposure." |
 
 Replace [N] with the "Ruled out by config evidence" number from your run.
 
