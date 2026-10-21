@@ -38,6 +38,13 @@ config (ACL, disabled service) already block it.
 Verdicts: EXPOSED (all required conditions evidenced), NOT_EXPOSED (a required condition is
 clearly absent — cite the line that proves absence or the version that is fixed),
 NEEDS_REVIEW (information missing, e.g. version unknown).
+Strict rules:
+- Evidence must show the vulnerable feature itself is enabled. A related setting is not
+  evidence: a management profile that permits only ping does not expose the management
+  web interface or SSH; an interface existing does not mean a service listens on it.
+- If the advisory lists specific builds or hotfixes and the config version is less precise
+  (e.g. config "9.16.4" vs affected "9.16.4.67"), version_match is "unknown" and the verdict
+  can be at most NEEDS_REVIEW.
 Evidence must be exact config lines (without the "NNNN| " prefix) with their line numbers.
 Return JSON:
 {"verdict":"EXPOSED|NOT_EXPOSED|NEEDS_REVIEW","confidence":0-1,
