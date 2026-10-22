@@ -213,24 +213,59 @@ Binding to `127.0.0.1` keeps the app reachable only from your machine.
 
 ## Run on a local domain (optional)
 
-For demos you can serve the app at a name such as **http://nemocve.com** on your own machine.
-Nothing is published: the name only resolves on the PC where you add it.
+For demos you can serve the app at **https://nemocve.com**, with a padlock, on your own machine.
+Nothing is published: the name and the certificate only work on the PC where you set them up.
 
-1. Point the name at your machine. In **PowerShell as Administrator** (Windows):
-   ```powershell
-   Add-Content "$env:SystemRoot\System32\drivers\etc\hosts" "`n127.0.0.1`tnemocve.com`n127.0.0.1`twww.nemocve.com"
-   ipconfig /flushdns
-   ```
-   On macOS/Linux: `echo "127.0.0.1 nemocve.com www.nemocve.com" | sudo tee -a /etc/hosts`
-2. Serve the app on port 80 (so no `:8000` is needed):
+### HTTPS with the one-click launcher (Windows, no admin rights)
+
+1. **Create the local certificate** (once). In Git Bash:
    ```bash
-   uv run uvicorn app.main:app --host 127.0.0.1 --port 80
-   # or with Docker:
-   docker run --rm -p 127.0.0.1:80:8000 -e NEBIUS_API_KEY=your_key ghcr.io/natrajexplore/exposurelens:latest
+   bash scripts/make-local-cert.sh
    ```
-3. Open **http://nemocve.com** and type the `http://` part. There is no certificate, so `https://` won't work.
+   This writes `certs/` (git-ignored): a server certificate for `nemocve.com`, `www.nemocve.com`
+   and `localhost`; a local CA that is **name-constrained** to those names only; and
+   `certs/nemocve.spki`, the server key's fingerprint.
+2. **Serve HTTPS on port 443:**
+   ```bat
+   uv run uvicorn app.main:app --host 127.0.0.1 --port 443 --ssl-keyfile certs\nemocve.key --ssl-certfile certs\nemocve.crt
+   ```
+   Or with Docker (same image, certificate mounted read-only):
+   ```bash
+   docker run --rm -p 127.0.0.1:443:8443 -v "$PWD/certs:/certs:ro" -e NEBIUS_API_KEY=your_key \
+     ghcr.io/natrajexplore/exposurelens:latest \
+     uvicorn app.main:app --host 0.0.0.0 --port 8443 --ssl-keyfile /certs/nemocve.key --ssl-certfile /certs/nemocve.crt
+   ```
+3. **Double-click [`scripts/open-nemocve.bat`](scripts/open-nemocve.bat).** It checks the server
+   is up, then opens a dedicated Chrome window at **https://nemocve.com** that:
+   - maps `nemocve.com` to `127.0.0.1` (`--host-resolver-rules`), so no hosts-file edit is needed;
+   - accepts **only** the local server key pinned in `certs/nemocve.spki`
+     (`--ignore-certificate-errors-spki-list`), so the page shows a padlock without installing
+     anything in Windows' certificate store. Every other site keeps Chrome's normal checks.
 
-To undo it, delete the two `nemocve.com` lines from the hosts file and run `ipconfig /flushdns`.
+   Your regular Chrome profile isn't affected. Typing `nemocve.com` there will still fail with
+   `DNS_PROBE_FINISHED_NXDOMAIN`, which is expected.
+
+### System-wide name (optional, needs admin)
+
+To make `nemocve.com` resolve for every app, add it to the hosts file from an **Administrator**
+Command Prompt, then check that `ping` replies from `127.0.0.1`:
+
+```bat
+echo 127.0.0.1 nemocve.com>> %SystemRoot%\System32\drivers\etc\hosts
+echo 127.0.0.1 www.nemocve.com>> %SystemRoot%\System32\drivers\etc\hosts
+ipconfig /flushdns
+ping nemocve.com
+```
+
+On macOS/Linux: `echo "127.0.0.1 nemocve.com www.nemocve.com" | sudo tee -a /etc/hosts`.
+Then plain **http://nemocve.com** works with the app on port 80
+(`uv run uvicorn app.main:app --host 127.0.0.1 --port 80`). For a padlock in any browser,
+trust `certs/nemocve-ca.crt` for your user (double-click it → Install Certificate → Current User
+→ Trusted Root Certification Authorities); because of its name constraint it can't vouch for
+any other site.
+
+**Undo:** delete the `nemocve.com` lines from the hosts file, remove *ExposureLens Local Dev CA*
+in `certmgr.msc` if you trusted it, and delete `certs/`.
 
 ## Configuration
 
@@ -276,7 +311,9 @@ curl -s localhost:8000/api/scan/<job_id>                          # poll until s
 | Different advisories on each run | Live search results vary. Curated advisories are always included, so the core cases stay stable |
 | `Permission denied: '/app/out'` on a container host | The platform runs as non-root; set `SPEND_FILE=/tmp/exposurelens/spend.json` |
 | `nemocve.com` (or your local name) doesn't open | The hosts entry is missing: editing the hosts file needs **Administrator** rights, and without them the command fails with "access denied". Check with `ping nemocve.com`, which should reply from `127.0.0.1` |
-| Local name opens but shows nothing | Nothing is listening on port 80: start the app with `--port 80` (or Docker `-p 127.0.0.1:80:8000`), and type `http://`, not `https://` |
+| Local name opens but shows nothing | Nothing is listening: start the app with `--port 80` for `http://`, or with the `--port 443 --ssl-*` options for `https://` |
+| `https://nemocve.com` shows "Not secure" | Open it with `scripts/open-nemocve.bat`, which pins the local server key. If you regenerated the certificate, the launcher reads the new pin automatically; close the old nemocve Chrome window first |
+| `DNS_PROBE_FINISHED_NXDOMAIN` for `nemocve.com` | You're in your regular Chrome. Use the window opened by `open-nemocve.bat`, or add the hosts entry (Administrator) |
 | `address already in use` on port 8000 or 80 | Another copy is running, e.g. the Docker container. Stop it with `docker stop exposurelens` or Ctrl+C in the other window |
 
 ## Hosting
@@ -298,6 +335,8 @@ app/main.py             FastAPI API + UI
 app/static/             Single-page UI
 jobs/nightly_scan.py    Batch job for Serverless Jobs / cron
 scripts/list_models.py  List and smoke-test the Nemotron models your key can call
+scripts/make-local-cert.sh  Create the local HTTPS certificate for nemocve.com (certs/, git-ignored)
+scripts/open-nemocve.bat    Open https://nemocve.com in a dedicated Chrome window (Windows)
 samples/configs/        Synthetic sample fleet (no real data)
 samples/advisories_offline.json  Curated advisory pack
 tests/                  Offline tests with a fake Nemotron router
@@ -321,7 +360,8 @@ docs/                   Plan and Devpost submission kit
 - **Stricter verdicts.** A related setting (e.g. a ping-only management profile) isn't evidence; an imprecise version match is at most NEEDS_REVIEW.
 - **Token Factory fixes.** Exact model IDs per tier; hidden reasoning turned off (`enable_thinking: false`) after it consumed the whole token budget and returned empty answers.
 - **Cost guard.** `BUDGET_USD` (default $0.50) stops model calls once estimated spend is reached, persisted across runs.
-- **Local-first showcase.** Pre-built Docker image on `ghcr.io`, localhost-only binding, optional local domain (`http://nemocve.com`), Windows Command Prompt instructions.
+- **Local-first showcase.** Pre-built Docker image on `ghcr.io`, localhost-only binding, Windows Command Prompt instructions.
+- **Local HTTPS domain.** `https://nemocve.com` with a padlock via `scripts/make-local-cert.sh` (name-constrained local CA) and `scripts/open-nemocve.bat` (dedicated Chrome window with name mapping and a pinned server key). No hosts edit or admin rights needed.
 - **Project setup.** `uv` project with `uv.lock`, `.dockerignore` keeps `.env` out of images, offline test suite (7 tests).
 
 ## Roadmap
