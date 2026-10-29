@@ -10,20 +10,34 @@
 
 ExposureLens is a multi-agent app for network security teams. You upload device configs
 (Cisco IOS-XE, Cisco Secure Firewall Threat Defense (FTD), Cisco ISE on ADE-OS, Palo Alto
-PAN-OS). Agents find the security advisories that apply,
-decide for each device whether the vulnerable feature is actually configured, cite the exact
-config lines that prove it, and draft a mitigation with verify and rollback commands.
+PAN-OS). Agents find the security advisories that apply, decide for each device whether the
+vulnerable feature is actually configured, cite the exact config lines that prove it, and
+draft a mitigation with verify and rollback commands.
 
 Built for the **Nebius x NVIDIA Global AI Hackathon** — *Best Apps and Agents* track.
 Powered by **NVIDIA Nemotron 3 (Nano, Super, Ultra) on Nebius Token Factory**, with **Tavily**
 for live advisory discovery. MIT licensed.
 
+### At a glance
+
+| | |
+|---|---|
+| **Answers** | "Is *this* device actually exposed to *this* CVE?", not just "is the version affected?" |
+| **Proof** | Every verdict cites config line numbers, and Python checks each line exists |
+| **Sample fleet** | 6 synthetic devices, 3 same-version pairs that a version scanner can't tell apart |
+| **One scan** | About 45–80 s, 11+ verdicts, about $0.02–0.03 of Token Factory credit |
+| **Run it** | `uv sync` → add `NEBIUS_API_KEY` to `.env` → `uv run uvicorn app.main:app` → http://localhost:8000 |
+| **Local demo URL** | **https://nemocve.com** with a padlock, on your own PC ([how](#run-on-a-local-domain-optional)) |
+| **Safety** | Read-only, localhost-only, keys never in the image, spend cap ([details](#security-and-privacy)) |
+
 **Contents:** [Problem](#the-problem) · [Results](#results-on-the-sample-fleet) ·
-[Platforms](#supported-platforms-and-curated-advisories) · [How it works](#how-it-works) ·
-[Verdicts](#how-a-verdict-is-decided) · [Performance](#measured-cost-and-latency) ·
-[Quick start](#quick-start) · [Docker](#run-with-docker) ·
-[Local domain](#run-on-a-local-domain-optional) · [Configuration](#configuration) · [API](#api) ·
-[Troubleshooting](#troubleshooting) · [Changelog](#changelog) · [Roadmap](#roadmap)
+[Demo](#demo-walkthrough) · [Platforms](#supported-platforms-and-curated-advisories) ·
+[How it works](#how-it-works) · [Verdicts](#how-a-verdict-is-decided) ·
+[Performance](#measured-cost-and-latency) · [Quick start](#quick-start) ·
+[Docker](#run-with-docker) · [Local domain](#run-on-a-local-domain-optional) ·
+[Everyday commands](#everyday-commands) · [Configuration](#configuration) · [API](#api) ·
+[Troubleshooting](#troubleshooting) · [Security](#security-and-privacy) ·
+[Changelog](#changelog) · [Roadmap](#roadmap)
 
 ---
 
@@ -54,6 +68,29 @@ point: same version, different exposure. A version scanner flags every one of th
 Live runs also surface newer advisories; each run's set varies with what Tavily finds.
 For every EXPOSED finding the app drafts an interim mitigation, verification and rollback
 commands, and a permanent fix, plus a 24-hour brief for the whole fleet.
+
+## Demo walkthrough
+
+A two-minute tour of the app, which is also the flow of the demo video:
+
+1. **Open the app** at http://localhost:8000, or https://nemocve.com via
+   [`scripts/open-nemocve.bat`](scripts/open-nemocve.bat).
+2. **Click "Scan the sample fleet."** The *Agent pipeline* panel lights up stage by stage:
+   NANO (fingerprint) → TAVILY + SUPER (advisory hunt) → ULTRA (exposure judge) → CODE
+   (evidence check) → SUPER (fix and brief). The live log shows each agent's work.
+3. **Read the summary cards:** *Exposed*, *Needs review*, *Ruled out by config evidence*
+   (the noise a version scanner would have handed you), and the scan cost compared with
+   running every call on Ultra.
+4. **Compare a same-version pair.** Expand `edge-rtr-01` (EXPOSED, `L32 ip http server`), then
+   `branch-rtr-02` (NOT EXPOSED, `L22 no ip http server`, "No action needed"). Do the same for
+   `ftd-vpn-01` / `ftd-dc-01`, and for the two `ise-01` findings.
+5. **Open an exposed finding's right column:** interim mitigation in the device's own CLI,
+   verify and rollback commands, permanent fix, and business impact. Then **Download report
+   (.md)** for a change ticket.
+6. **Scroll to "Which Nemotron did what":** calls, tokens, latency and estimated cost per tier.
+
+To steer the advisory search, type a CVE such as `CVE-2025-20333` in the focus box before
+scanning, or upload up to 6 of your own configs (remove secrets first).
 
 ## Supported platforms and curated advisories
 
@@ -267,6 +304,36 @@ any other site.
 **Undo:** delete the `nemocve.com` lines from the hosts file, remove *ExposureLens Local Dev CA*
 in `certmgr.msc` if you trusted it, and delete `certs/`.
 
+## Everyday commands
+
+| What | Where it answers | Command |
+|---|---|---|
+| App over HTTP | http://localhost:8000 | `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000` |
+| App on port 80 (local domain over HTTP) | http://localhost, http://nemocve.com* | `uv run uvicorn app.main:app --host 127.0.0.1 --port 80` |
+| App over HTTPS | https://nemocve.com | `uv run uvicorn app.main:app --host 127.0.0.1 --port 443 --ssl-keyfile certs\nemocve.key --ssl-certfile certs\nemocve.crt` |
+| Open the HTTPS demo window | — | double-click `scripts\open-nemocve.bat` |
+| Tests (no keys) | — | `uv run pytest -q` |
+| Batch scan to `out/` | — | `uv run python -m jobs.nightly_scan` |
+| Check keys, models, spend | — | `curl http://localhost:8000/api/health` |
+| Reset the spend counter | — | delete `out/spend.json` |
+
+\* only with the hosts-file entry. Each `uv run uvicorn` keeps its window busy: stop it with
+**Ctrl+C**, and run each server in its own window.
+
+If you run the app as named Docker containers instead (one for HTTP, one for HTTPS, created
+with `docker run -d --name …` and the options shown above), manage them with:
+
+```bat
+rem After a reboot (start Docker Desktop first):
+docker start exposurelens exposurelens-https
+rem Free ports 80, 443 and 8000:
+docker stop exposurelens exposurelens-https
+rem Watch scans and errors (Ctrl+C to stop watching):
+docker logs -f exposurelens
+rem After code changes, rebuild, then remove and recreate the containers:
+docker build -t exposurelens .
+```
+
 ## Configuration
 
 All settings are environment variables (or `.env`, see [`.env.example`](.env.example)).
@@ -343,6 +410,26 @@ tests/                  Offline tests with a fake Nemotron router
 docs/                   Plan and Devpost submission kit
 ```
 
+## Security and privacy
+
+- **Read-only.** ExposureLens never connects to, logs into or changes a network device. Every
+  command it produces is labelled as a draft for human review.
+- **Your configs stay in memory.** Uploaded configs are held in the running process for the
+  scan and never written to disk. They are sent to Nebius Token Factory for analysis. Tavily
+  receives only vendor, OS and version (plus any focus-box text), never config contents. Remove secrets such as
+  passwords and SNMP communities before uploading.
+- **Keys never in the image.** `.dockerignore` excludes `.env`; keys are passed at run time.
+  `.env`, `out/` and `certs/` are git-ignored.
+- **Localhost only.** All documented commands bind to `127.0.0.1`. If you ever host it,
+  set `APP_ACCESS_KEY` so scans require a key.
+- **Spend cap.** `BUDGET_USD` (default $0.50) refuses model calls once estimated spend is
+  reached, and the total persists across restarts.
+- **Evidence is checked, not trusted.** Model-cited config lines are verified in code;
+  advisory URLs must come from search results; version ranges must be quoted from the source.
+- **Local HTTPS is narrowly scoped.** The local CA is name-constrained to `nemocve.com` and
+  `localhost`, and the Chrome launcher trusts only the one pinned server key, in its own
+  profile. Nothing is added to the Windows certificate store.
+
 ## Limitations
 
 - Supports Cisco IOS-XE, FTD, ISE (ADE-OS) and Palo Alto PAN-OS configs today; others are parsed best-effort.
@@ -362,7 +449,8 @@ docs/                   Plan and Devpost submission kit
 - **Cost guard.** `BUDGET_USD` (default $0.50) stops model calls once estimated spend is reached, persisted across runs.
 - **Local-first showcase.** Pre-built Docker image on `ghcr.io`, localhost-only binding, Windows Command Prompt instructions.
 - **Local HTTPS domain.** `https://nemocve.com` with a padlock via `scripts/make-local-cert.sh` (name-constrained local CA) and `scripts/open-nemocve.bat` (dedicated Chrome window with name mapping and a pinned server key). No hosts edit or admin rights needed.
-- **Project setup.** `uv` project with `uv.lock`, `.dockerignore` keeps `.env` out of images, offline test suite (7 tests).
+- **Project setup.** `uv` project with `uv.lock`, `.dockerignore` keeps `.env` out of images, `.gitattributes` pins script line endings, offline test suite (7 tests).
+- **Docs.** At-a-glance summary, demo walkthrough, everyday commands, and a security and privacy section.
 
 ## Roadmap
 
